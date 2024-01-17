@@ -1,30 +1,4 @@
 {% extends "admin/challenges/create.html" %}
-{% block name %}
-<div class="form-group">
-    <label>
-        Import:<br>
-        <small class="form-text text-muted">
-            Import config from YAML file:
-        </small>
-    </label>
-    <!-- <br> -->
-    <input type="file" id="meta-importer" class="form-control" accept=".xml,.yaml,.yml"
-        onchange="import_from_metayaml(this)" />
-    <!-- <br> -->
-    <!-- <small class="form-text text-muted" id="meta-importer-text">
-        No files currently selected for upload
-    </small> -->
-</div>
-<div class="form-group">
-    <label>
-        Name:<br>
-        <small class="form-text text-muted">
-            The name of your challenge
-        </small>
-    </label>
-    <input type="text" class="form-control" name="name" placeholder="Enter challenge name">
-</div>
-{% endblock %}
 {% block category %}
 <div class="form-group">
     <label>

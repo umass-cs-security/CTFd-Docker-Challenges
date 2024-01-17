@@ -1021,14 +1021,42 @@ class ContainerAPI(Resource):
     @authed_only
     # I wish this was Post... Issues with API/CSRF and whatnot. Open to a Issue solving this.
     def get(self):
-        # name should in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
         container = request.args.get("name")
         if not container:
             return abort(403)
+        container = container.lower()
         docker = DockerConfig.query.filter_by(id=1).first()
         containers = DockerChallengeTracker.query.all()
-        if container not in get_repositories(docker, with_tags=True):
-            return abort(403)
+
+        possible_images_with_tag = get_repositories(docker, with_tags=True)
+        print(container)
+        # container following format "docker registry/imageName():imageTag)"
+        if "/" in container:
+            container = container.split("/")[-1]
+            name_tag = container.split(":")
+            print(possible_images_with_tag)
+            if len(name_tag) == 1:
+                image_exist = False
+                for elem in possible_images_with_tag:
+                    if name_tag[0] in elem:
+                        container = elem
+                        image_exist = True
+                if not image_exist:
+                    print("c1")
+        
+                    return abort(403)
+            elif len(name_tag) > 2:
+                print("c2")
+                return abort(403)
+            else:
+                if container not in possible_images_with_tag:
+                    print("c3")
+                    return abort(403)
+        else:
+            # name should in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
+            if container not in possible_images_with_tag:
+                print("c4")
+                return abort(403)
         if is_teams_mode():
             session = get_current_team()
             # First we'll delete all old docker containers (+2 hours)
