@@ -1,0 +1,39 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<div class="jumbotron">
+    <div class="container">
+        <h1>Docker Import</h1>
+    </div>
+</div>
+<div class="container">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            {% for error in errors %}
+            <div class="alert alert-danger alert-dismissable" role="alert">
+                <span class="sr-only">Error:</span>
+                {{ error }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
+                        aria-hidden="true">x</span></button>
+            </div>
+            {% endfor %}
+            <form method="post" accept-charset="utf-8" autocomplete="off" role="form" name='docker_import'
+                class="form-horizontal" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="meta_importer">
+                        File
+                    </label>
+                    <input type="file" id="meta_importer" name="meta_importer" class="form-control"
+                        accept=".xml,.yaml,.yml" onchange="import_from_metayaml(this)" />
+                </div>
+                {{ form.nonce() }}
+                <div class="col-md-13 text-center">
+                    <button type="submit" tabindex="0" class="btn btn-md btn-primary btn-outlined">
+                        Submit
+                    </button>
+                </div>
+        </div>
+        <input type="hidden" name="id" value="1">
+        </form>
+    </div>
+</div>
+{% endblock content %}
