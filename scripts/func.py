@@ -48,7 +48,6 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
     target_registry_name = "/".join(target_container_name_components[:-1])
 
     if target_registry_name != docker.hostname:
-        # print(target_registry_name, docker.hostname)
         return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
 
     target_container_name = target_container_name_components[-1]
@@ -198,7 +197,6 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
                 "verify": False,
             }
             req_params.update(tls_params)
-        # print(json.dumps(req_params, indent=4))
         res = http_func(**req_params)
     except:
         print(traceback.print_exc())
