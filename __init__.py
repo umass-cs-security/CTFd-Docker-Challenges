@@ -1,9 +1,11 @@
+from http.client import HTTPException
 import traceback
-from typing import Dict
+from typing import Any, Dict, Tuple
 
 import werkzeug
 import yaml
 
+from werkzeug import exceptions as WExceptions
 from werkzeug.datastructures import FileStorage
 
 from CTFd.plugins.challenges import BaseChallenge, CHALLENGE_CLASSES, get_chal_class
@@ -48,6 +50,7 @@ import CTFd.utils.scores
 from CTFd.api.v1.challenges import ChallengeList, Challenge
 from flask_restx import Namespace, Resource
 from flask import (
+    Response,
     flash,
     request,
     Blueprint,
@@ -84,6 +87,17 @@ from CTFd.plugins import register_admin_plugin_menu_bar
 from CTFd.forms import BaseForm
 from CTFd.forms.fields import SubmitField
 from CTFd.utils.config import get_themes
+
+DOCKER_CHALLENGES_LABEL = "challenge"
+Default_Headers = {"Content-Type": "application/json"}
+
+ADMINISTRATIVE = "Please contact Administrator or Professor Parviz for this error!"
+REGISTRY_EMPTY = "Registry is Empty! Please contact Administrator or Professor Parviz to add challenge to Registry!"
+INVALID_REGISTRY_SPECIFIED = (
+    "Invalid Registry Address Specified. Mismatch with the stored record."
+)
+INVALID_FORMAT = "Invalid Parameter Format Specified."
+IMAGE_NOT_EXIST = "Image does not Exist in Docker Registry!"
 
 
 class DockerConfig(db.Model):
@@ -693,11 +707,78 @@ def get_required_ports(docker, image):
     return
 
 
-def create_container(docker, image, team):
+def dict_to_query_param(inputs: Dict[str, Any]) -> str:
+    return "?" + "&".join([f"{key}={value}" for key, value in inputs.items()])
+
+
+def start_container(docker, container_name, headers=None):
+    if headers is None:
+        headers = Default_Headers
+
+    start_res = do_request(
+        docker,
+        url=f"/containers/{container_name}/start",
+        method="POST",
+        host=docker.enginename,
+        headers=headers,
+    )
+    if start_res.status_code not in [204, 304]:
+        return False, start_res.json()["message"]
+    return True, start_res
+
+
+def delete_container(docker, container_name, headers=None):
+    query_param = {
+        "force": True,
+    }
+    if headers is None:
+        headers = Default_Headers
+
+    print(f"Deleting container: {container_name}")
+    resp = do_request(
+        docker,
+        url=f"/containers/{container_name}{dict_to_query_param(query_param)}",
+        method="DELETE",
+        host=docker.enginename,
+        headers=headers,
+    )
+    if resp.status_code == 500:
+        print(f"Fail to Delete container: {container_name}. {resp.json()['message']}")
+        return False, resp.json()["message"]
+    print(f"Deleted container: {container_name}")
+    return True, resp
+
+
+def delete_stopped_containers(docker, headers=None):
+    if headers is None:
+        headers = Default_Headers
+    resp = do_request(
+        docker,
+        url=f"/containers/prune",
+        method="POST",
+        host=docker.enginename,
+        data={"label": DOCKER_CHALLENGES_LABEL},
+        headers=headers,
+    )
+    if resp.status_code == 500:
+        return False, resp.json()["message"]
+    return True, resp
+
+
+# referred api: https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerCreate
+def create_container(docker, image, team, team_indexing=None):
+    delete_stopped_containers(docker)
     needed_ports = get_required_ports(docker, image)
     if needed_ports is None:
-        raise ValueError("No port(s) exposed, Please re-check the host docker image!")
-    team = hashlib.md5(team.encode("utf-8")).hexdigest()[:10]
+        return None, "No port(s) exposed, Please re-check the host docker image!"
+    if team_indexing == None:
+        team = hashlib.md5(team.encode("utf-8")).hexdigest()[:10]
+    else:
+        if team_indexing + 10 >= 32:
+            team_indexing = 22
+        team = hashlib.md5(team.encode("utf-8")).hexdigest()[
+            team_indexing : team_indexing + 10
+        ]
     container_name = "%s_%s" % (image.split(":")[1], team)
     assigned_ports = dict()
     for i in needed_ports:
@@ -712,96 +793,130 @@ def create_container(docker, image, team):
     for i in needed_ports:
         ports[i] = {}
         bindings[i] = [{"HostPort": tmp_ports.pop()}]
-    headers = {"Content-Type": "application/json"}
     data = json.dumps(
         {
             "Image": f"{docker.hostname}/{image}",  # image is under the registry
             "ExposedPorts": ports,
-            "HostConfig": {"PortBindings": bindings},
+            "HostConfig": {
+                "PortBindings": bindings,
+                "NanoCpus": 1000,
+                "Memory": 209715200,
+            },
+            "Config": {
+                "Labels": {
+                    "Type": DOCKER_CHALLENGES_LABEL,
+                },
+            },
         }
     )
-    if docker.tls_enabled:
-        # r = requests.post(
-        #     url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
-        #     cert=CERT,
-        #     verify=False,
-        #     data=data,
-        #     headers=headers,
-        # )
-        create_res = do_request(
-            docker,
-            url=f"/containers/create?name={container_name}",
-            method="POST",
-            host=docker.enginename,
-            headers=headers,
-            data=data,
-        )
-        result = create_res.json()
-        start_res = do_request(
-            docker,
-            url=f"/containers/{result['Id']}/start",
-            # url=f"/containers/create?name={container_name}",
-            method="POST",
-            host=docker.enginename,
-            headers=headers,
-        )
-        # requests.post(
-        #     url=f"/containers/{result['Id']}/start",
-        #     cert=CERT,
-        #     verify=False,
-        #     headers=headers,
-        # )
-    else:
-        # r = requests.post(
-        #     url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
-        #     data=data,
-        #     headers=headers,
-        # )
-        create_res = do_request(
-            docker,
-            url=f"/containers/create?name={container_name}",
-            method="POST",
-            host=docker.enginename,
-            headers=headers,
-            data=data,
-        )
-        print(
-            create_res.request.method,
-            create_res.request.url,
-            create_res.status_code,
-            create_res.request.body,
-        )
-        result = create_res.json()
-        # print(result)
-        # name conflicts are not handled properly
-        start_res = do_request(
-            docker,
-            url=f"/containers/{result['Id']}/start",
-            # url=f"/containers/create?name={container_name}",
-            method="POST",
-            host=docker.enginename,
-            headers=headers,
-        )
-        # print(r.request.method, r.request.url, r.request.body)
-        # result = r.json()
-        # print(result)
-        # # name conflicts are not handled properly
-        # s = requests.post(
-        #     url="%s/containers/%s/start" % (URL_TEMPLATE, result["Id"]), headers=headers
-        # )
-    return result, data
-
-
-def delete_container(docker, instance_id):
-    headers = {"Content-Type": "application/json"}
-    do_request(
+    # r = requests.post(
+    #     url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
+    #     cert=CERT,
+    #     verify=False,
+    #     data=data,
+    #     headers=headers,
+    # )
+    # create_res = do_request(
+    #     docker,
+    #     url=f"/containers/create?name={container_name}",
+    #     method="POST",
+    #     host=docker.enginename,
+    #     headers=headers,
+    #     data=data,
+    # )
+    # result = create_res.json()
+    # start_res = do_request(
+    #     docker,
+    #     url=f"/containers/{result['Id']}/start",
+    #     # url=f"/containers/create?name={container_name}",
+    #     method="POST",
+    #     host=docker.enginename,
+    #     headers=headers,
+    # )
+    # requests.post(
+    #     url=f"/containers/{result['Id']}/start",
+    #     cert=CERT,
+    #     verify=False,
+    #     headers=headers,
+    # )
+    # r = requests.post(
+    #     url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
+    #     data=data,
+    #     headers=headers,
+    # )
+    create_res = do_request(
         docker,
-        f"/containers/{instance_id}?force=true",
+        url=f"/containers/create?name={container_name}",
+        method="POST",
         host=docker.enginename,
-        headers=headers,
-        method="DELETE",
+        headers=Default_Headers,
+        data=data,
     )
-    return True
+    print(
+        create_res.request.method,
+        create_res.request.url,
+        create_res.status_code,
+        create_res.request.body,
+    )
+    result = create_res.json()
+
+    create_status_code = create_res.status_code
+
+    print(result)
+    if create_status_code == 201:
+        ok, resp = start_container(docker, result["Id"])
+        print(resp)
+        if not ok:
+            delete_container(docker, container_name)
+            return None, resp
+        # do_request(
+        #     docker,
+        #     url=f"/containers/{result['Id']}/start",
+        #     # url=f"/containers/create?name={container_name}",
+        #     method="POST",
+        #     host=docker.enginename,
+        #     headers=headers,
+        # )
+        return result, data
+    elif create_status_code == 500 or create_status_code == 400:
+        # 400: bad parameter, 500: internal error
+        delete_container(docker, container_name)
+        return (
+            None,
+            f"{create_status_code} Internal Error. Please contact website administrator or Professor Parviz.",
+        )
+    elif create_status_code == 404:
+        # 404: Image not found
+        delete_container(docker, container_name)
+        return None, result["message"]
+    else:
+        # 409: name conflit => solve by calling function again
+        if team_indexing == None:
+            team_indexing = 0
+        # increment md5 index by one to avoid name conflit
+        team_indexing += 1
+        return create_container(docker, image, team, team_indexing)
+    # name conflicts are not handled properly
+    # print(r.request.method, r.request.url, r.request.body)
+    # result = r.json()
+    # print(result)
+    # # name conflicts are not handled properly
+    # s = requests.post(
+    #     url="%s/containers/%s/start" % (URL_TEMPLATE, result["Id"]), headers=headers
+    # )
+    # return result, data
+
+
+# def delete_container(docker, instance_id):
+#     headers = {"Content-Type": "application/json"}
+#     do_request(
+#         docker,
+#         f"/containers/{instance_id}?force=true",
+#         host=docker.enginename,
+#         headers=headers,
+#         method="DELETE",
+#     )
+#     return True
 
 
 class DockerChallengeType(BaseChallenge):
@@ -1016,47 +1131,71 @@ container_namespace = Namespace(
 )
 
 
+def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str, str]:
+    """
+    return (
+        whether image in registry,
+        image name if necessary,
+        error msg,
+    )
+    """
+    fetched_repos = get_repositories(docker, with_tags=True)
+    if fetched_repos is None or len(fetched_repos) == 0:
+        return False, None, REGISTRY_EMPTY
+
+    if "/" not in target_container_name:
+        # name in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
+        return (
+            target_container_name in fetched_repos,
+            target_container_name,
+            IMAGE_NOT_EXIST + " " + ADMINISTRATIVE,
+        )
+
+    # in format of 'docker registry:registry port/image:image tag'
+    target_container_name_components = target_container_name.split("/")
+    target_registry_name = "/".join(target_container_name_components[:-1])
+
+    if target_registry_name != docker.hostname:
+        return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
+
+    target_container_name = target_container_name_components[-1]
+
+    image_tag = target_container_name.split(":")
+    if len(image_tag) == 2:
+        return target_container_name in fetched_repos, target_container_name
+    elif len(image_tag) != 1:
+        return (
+            False,
+            None,
+            f"{INVALID_FORMAT} Image should in format of '<docker image name>:<docker image tag>'. {ADMINISTRATIVE}",
+        )
+    # only one element, assume to be image name without tag
+    target_image = image_tag[0]
+    for repo_tag in fetched_repos:
+        if target_image in repo_tag:
+            return True, repo_tag, None
+    return (False, None, IMAGE_NOT_EXIST + " " + ADMINISTRATIVE)
+
+
 @container_namespace.route("", methods=["POST", "GET"])
 class ContainerAPI(Resource):
     @authed_only
     # I wish this was Post... Issues with API/CSRF and whatnot. Open to a Issue solving this.
     def get(self):
+        # name should in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
         container = request.args.get("name")
         if not container:
-            return abort(403)
-        container = container.lower()
+            return abort(403, description="Image Not Specified in Request!")
         docker = DockerConfig.query.filter_by(id=1).first()
         containers = DockerChallengeTracker.query.all()
 
-        possible_images_with_tag = get_repositories(docker, with_tags=True)
-        print(container)
-        # container following format "docker registry/imageName():imageTag)"
-        if "/" in container:
-            container = container.split("/")[-1]
-            name_tag = container.split(":")
-            print(possible_images_with_tag)
-            if len(name_tag) == 1:
-                image_exist = False
-                for elem in possible_images_with_tag:
-                    if name_tag[0] in elem:
-                        container = elem
-                        image_exist = True
-                if not image_exist:
-                    print("c1")
-        
-                    return abort(403)
-            elif len(name_tag) > 2:
-                print("c2")
-                return abort(403)
-            else:
-                if container not in possible_images_with_tag:
-                    print("c3")
-                    return abort(403)
-        else:
-            # name should in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
-            if container not in possible_images_with_tag:
-                print("c4")
-                return abort(403)
+        ok, container, error_msg = VerifyImageInRegistry(docker, container)
+        if not ok:
+            return abort(
+                405,
+                description=error_msg,
+            )
+
         if is_teams_mode():
             session = get_current_team()
             # First we'll delete all old docker containers (+2 hours)
@@ -1098,7 +1237,10 @@ class ContainerAPI(Resource):
             check != None
             and not (unix_time(datetime.utcnow()) - int(check.timestamp)) >= 300
         ):
-            return abort(403)
+            return abort(
+                406,
+                description="You can only revert a container once per 5 minutes! Please be patient.",
+            )
         # The exception would be if we are reverting a box. So we'll delete it if it exists and has been around for more than 5 minutes.
         elif check != None:
             delete_container(docker, check.instance_id)
@@ -1111,22 +1253,31 @@ class ContainerAPI(Resource):
                     docker_image=container
                 ).delete()
             db.session.commit()
-        create = create_container(docker, container, session.name)
-        ports = json.loads(create[1])["HostConfig"]["PortBindings"].values()
+        created_info, payload = create_container(docker, container, session.name)
+        if created_info is None:
+            # print("Error during creating container: ", payload)
+            return abort(403, payload)
+        ports = json.loads(payload)["HostConfig"]["PortBindings"].values()
+        print(
+            f"Adding new container: <{container}>:<{created_info['Id']}> for <{session.name}>"
+        )
         entry = DockerChallengeTracker(
             team_id=session.id if is_teams_mode() else None,
             user_id=session.id if not is_teams_mode() else None,
             docker_image=container,
             timestamp=unix_time(datetime.utcnow()),
             revert_time=unix_time(datetime.utcnow()) + 300,
-            instance_id=create[0]["Id"],
-            ports=",".join([p[0]["HostPort"] for p in ports]),
-            host=str(docker.hostname).split(":")[0],
+            instance_id=created_info["Id"],
+            ports=",".join([port[0]["HostPort"] for port in ports]),
+            host=str(docker.enginename).split(":")[0],
+        )
+        print(
+            f"Added new container: <{container}>:<{created_info['Id']}> for <{session.name}> at {entry.timestamp}"
         )
         db.session.add(entry)
         db.session.commit()
         # db.session.close()
-        return
+        return True
 
 
 active_docker_namespace = Namespace(

@@ -24,3 +24,8 @@ CTFd.plugin.run((_CTFd) => {
         });
     });
 });
+
+function import_from_metayaml() {
+    console.log(importer_text)
+
+}
