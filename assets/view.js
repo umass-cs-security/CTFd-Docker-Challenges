@@ -41,11 +41,7 @@ CTFd._internal.challenge.submit = function (preview) {
 
 function get_docker_status(container) {
     $.get(`/api/v1/docker_status?name=${container}`, function (result) {
-        console.log(result)
         $.each(result['data'], function (i, item) {
-            // if (!item.curr_tracked_challenge) {
-            //     return false;
-            // }
             var ports = String(item.ports).split(',');
             var data = '';
             $.each(ports, function (x, port) {
@@ -77,50 +73,36 @@ function get_docker_status(container) {
 function start_container(container) {
     $('#docker_container').html('<div class="text-center"><i class="fas fa-circle-notch fa-spin fa-1x"></i></div>');
     $.get("/api/v1/container", { 'name': container })
-    .done(function (result) {
-        get_docker_status(container);
-    }).fail(function (jqXHR, textStatus, errorThrown) {
-        ezal({
-            title: "Attention!",
-            body: jqXHR.responseJSON["message"],
-            button: "Got it!"
+        .done(function (result) {
+            get_docker_status(container);
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            ezal({
+                title: "Attention!",
+                body: jqXHR.responseJSON["message"],
+                button: "Got it!"
+            });
+            get_docker_status(container);
         });
-    });
 }
 
-const req_fail_msg = (title, body) => {
-    return ('<div class="modal fade" tabindex="-1" role="dialog">' +
-        '  <div class="modal-dialog" role="document">' +
-        '    <div class="modal-content">' +
-        '      <div class="modal-header">' +
-        `        <h5 class="modal-title">${title}</h5>` +
-        '        <button type="button" class="close" data-dismiss="modal" aria-label="Close">' +
-        '          <span aria-hidden="true">&times;</span>' +
-        "        </button>" +
-        "      </div>" +
-        '      <div class="modal-body">' +
-        `        <p>${body}</p>` +
-        "      </div>" +
-        '      <div class="modal-footer">' +
-        "      </div>" +
-        "    </div>" +
-        "  </div>" +
-        "</div>")
-};
-
 function ezal(args) {
-    var res = req_fail_msg(args.title, args.body);
-    console.log(res, args)
-    var obj = $(res);
-    var button = `<button type="button" class="btn btn-primary" data-dismiss="modal">${args.button}</button>`;
-    obj.find(".modal-footer").append(button);
-    $("main").append(obj);
+    $("#error_dialog_title").html(args.title);
+    $("#error_dialog_body").html(args.body);
+    $("#error_dialog_confirm_btn").html(args.button);
+    $("#error_dialog").modal("show");
 
-    obj.modal("show");
 
-    $(obj).on("hidden.bs.modal", function (e) {
-        $(this).modal("dispose");
+    $("#error_dialog").on("hidden.bs.modal", function (e) {
+        // $(this).modal("dispose");
+        $("#error_dialog").model("hide");
     });
 
-    return obj;
+    $("#error_dialog_close_btn").click(function (e) {
+        $("#error_dialog").modal("hide");
+    })
+
+    $("#error_dialog_confirm_btn").click(function (e) {
+        $("#error_dialog").modal("hide");
+    })
+
 }

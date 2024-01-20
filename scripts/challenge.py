@@ -1,7 +1,15 @@
 import json
 from flask import Blueprint
-from wtforms import Flags
-from CTFd.models import ChallengeFiles, Challenges, Fails, Hints, Solves, Tags, db
+from CTFd.models import (
+    ChallengeFiles,
+    Challenges,
+    Fails,
+    Hints,
+    Solves,
+    Tags,
+    db,
+    Flags,
+)
 from CTFd.plugins.challenges import BaseChallenge
 from CTFd.plugins.docker_challenges.scripts.container import delete_container
 from CTFd.plugins.docker_challenges.scripts.model import (
