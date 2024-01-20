@@ -271,20 +271,22 @@ def define_docker_status(app):
         docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
         target_challenge_name = request.args.get("name", "").lower()
+
         if target_challenge_name != "":
             ok, target_challenge_name, error_msg = VerifyImageInRegistry(
                 docker_config, target_challenge_name
             )
             if not ok:
-                # if not ok, just consider this as ordinary status query, i.e., return all result
-                target_challenge_name = ""
+                # if not ok, just consider this as invalid status query, i.e., return no result
+                return render_template("admin_docker_status.html", dockers=[])
 
         for curr_tracked_challenge in docker_tracker:
+            curr_tracked_challenge: DockerChallengeTracker
             if target_challenge_name != "":
                 if curr_tracked_challenge.docker_image == target_challenge_name:
-                    return render_template(
-                        "admin_docker_status.html", dockers=[curr_tracked_challenge]
-                    )
+                    target = curr_tracked_challenge.__dict__.copy()
+                    setattr(target, "requested", True)
+                    return render_template("admin_docker_status.html", dockers=[target])
                 else:
                     continue
             if is_teams_mode():

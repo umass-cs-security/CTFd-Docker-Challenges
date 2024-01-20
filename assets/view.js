@@ -38,34 +38,37 @@ CTFd._internal.challenge.submit = function (preview) {
 };
 
 
+
 function get_docker_status(container) {
-    $.post("/api/v1/docker_status", function (result) {
+    $.get(`/api/v1/docker_status?name=${container}`, function (result) {
+        console.log(result)
         $.each(result['data'], function (i, item) {
-            if (item.docker_image == container) {
-                var ports = String(item.ports).split(',');
-                var data = '';
-                $.each(ports, function (x, port) {
-                    port = String(port)
-                    data = data + 'Host: ' + item.host + ' Port: ' + port + '<br />';
-                })
-                $('#docker_container').html('<pre>Docker Container Information:<br />' + data + '<div class="mt-2" id="' + String(item.instance_id).substring(0, 10) + '_revert_container"></div>');
-                var countDownDate = new Date(parseInt(item.revert_time) * 1000).getTime();
-                var x = setInterval(function () {
-                    var now = new Date().getTime();
-                    var distance = countDownDate - now;
-                    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-                    if (seconds < 10) {
-                        seconds = "0" + seconds
-                    }
-                    $("#" + String(item.instance_id).substring(0, 10) + "_revert_container").html('Next Revert Available in ' + minutes + ':' + seconds);
-                    if (distance < 0) {
-                        clearInterval(x);
-                        $("#" + String(item.instance_id).substring(0, 10) + "_revert_container").html('<a onclick="start_container(\'' + item.docker_image + '\');" class=\'btn btn-dark\'><small style=\'color:white;\'><i class="fas fa-redo"></i> Revert</small></a>');
-                    }
-                }, 1000);
-                return false;
-            };
+            // if (!item.curr_tracked_challenge) {
+            //     return false;
+            // }
+            var ports = String(item.ports).split(',');
+            var data = '';
+            $.each(ports, function (x, port) {
+                port = String(port)
+                data = data + 'Host: ' + item.host + ' Port: ' + port + '<br />';
+            })
+            $('#docker_container').html('<pre>Docker Container Information:<br />' + data + '<div class="mt-2" id="' + String(item.instance_id).substring(0, 10) + '_revert_container"></div>');
+            var countDownDate = new Date(parseInt(item.revert_time) * 1000).getTime();
+            var x = setInterval(function () {
+                var now = new Date().getTime();
+                var distance = countDownDate - now;
+                var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                if (seconds < 10) {
+                    seconds = "0" + seconds
+                }
+                $("#" + String(item.instance_id).substring(0, 10) + "_revert_container").html('Next Revert Available in ' + minutes + ':' + seconds);
+                if (distance < 0) {
+                    clearInterval(x);
+                    $("#" + String(item.instance_id).substring(0, 10) + "_revert_container").html('<a onclick="start_container(\'' + item.docker_image + '\');" class=\'btn btn-dark\'><small style=\'color:white;\'><i class="fas fa-redo"></i> Revert</small></a>');
+                }
+            }, 1000);
+            return false;
         });
     });
 };
