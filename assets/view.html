@@ -34,20 +34,11 @@ function get_docker_status(container) {
 };
 </script>
 <script>
-    const DOCKER_CONTAINER = '{{ challenge.docker_image | safe }}';
-    var DOCKER_AVAILABLE = false;
+    var DOCKER_CONTAINER = '{{ challenge.docker_image | safe }}';
     (function() {
-        if ($("#docker_availablity") == "true") {
-            $("#docker_error").hide();
             get_docker_status(DOCKER_CONTAINER);
-        } else {
-            $('#docker_container').html('<div class="text-center"><i class="fas fa-circle-notch fa-spin fa-1x"></i></div>');
-            $("#dockcontainerer_error").show();
-        }
     })();
 </script>
-<div id="docker_availablity" name="true" hidden></div>
-<div class="col-md-9" id="docker_error" hidden></div>
 {{ challenge.html }}
 <div class='mb-3 text-center' id='docker_container'>
     <span>

@@ -270,13 +270,33 @@ def define_docker_status(app):
     def docker_admin():
         docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
-        for i in docker_tracker:
+        target_challenge_name = request.args.get("name", "").lower()
+        if target_challenge_name != "":
+            ok, target_challenge_name, error_msg = VerifyImageInRegistry(
+                docker_config, target_challenge_name
+            )
+            if not ok:
+                # if not ok, just consider this as ordinary status query, i.e., return all result
+                target_challenge_name = ""
+
+        for curr_tracked_challenge in docker_tracker:
+            if target_challenge_name != "":
+                if curr_tracked_challenge.docker_image == target_challenge_name:
+                    return render_template(
+                        "admin_docker_status.html", dockers=[curr_tracked_challenge]
+                    )
+                else:
+                    continue
             if is_teams_mode():
-                name = Teams.query.filter_by(id=i.team_id).first()
-                i.team_id = name.name
+                name = Teams.query.filter_by(id=curr_tracked_challenge.team_id).first()
+                curr_tracked_challenge.team_id = name.name
             else:
-                name = Users.query.filter_by(id=i.user_id).first()
-                i.user_id = name.name
+                name = Users.query.filter_by(id=curr_tracked_challenge.user_id).first()
+                curr_tracked_challenge.user_id = name.name
+
+        if target_challenge_name != "":
+            return render_template("admin_docker_status.html", dockers=[])
+
         return render_template("admin_docker_status.html", dockers=docker_tracker)
 
     app.register_blueprint(admin_docker_status)
@@ -1139,6 +1159,7 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
         error msg,
     )
     """
+    target_container_name = target_container_name.lower()
     fetched_repos = get_repositories(docker, with_tags=True)
     if fetched_repos is None or len(fetched_repos) == 0:
         return False, None, REGISTRY_EMPTY
@@ -1156,13 +1177,17 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
     target_registry_name = "/".join(target_container_name_components[:-1])
 
     if target_registry_name != docker.hostname:
+        # print(target_registry_name, docker.hostname)
         return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
 
     target_container_name = target_container_name_components[-1]
-
     image_tag = target_container_name.split(":")
     if len(image_tag) == 2:
-        return target_container_name in fetched_repos, target_container_name
+        return (
+            target_container_name in fetched_repos,
+            target_container_name,
+            IMAGE_NOT_EXIST + " " + ADMINISTRATIVE,
+        )
     elif len(image_tag) != 1:
         return (
             False,

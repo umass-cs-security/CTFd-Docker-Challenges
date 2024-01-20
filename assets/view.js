@@ -39,7 +39,7 @@ CTFd._internal.challenge.submit = function (preview) {
 
 
 function get_docker_status(container) {
-    $.get("/api/v1/docker_status", function (result) {
+    $.post("/api/v1/docker_status", function (result) {
         $.each(result['data'], function (i, item) {
             if (item.docker_image == container) {
                 var ports = String(item.ports).split(',');
@@ -70,58 +70,13 @@ function get_docker_status(container) {
     });
 };
 
-const error_template = (error) => {
-    return ('<div class="alert alert-danger alert-dismissable" role="alert">' +
-    '<span class="sr-only">Error:</span>'+
-    error + 
-    '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
-    '<span aria-hidden="true">x</span></button>'+
-    '</div>'
-    )
-}
-
-function show_error(errors) {
-//     {% for error in errors %}
-// <div class="alert alert-danger alert-dismissable" role="alert">
-//     <span class="sr-only">Error:</span>
-//     {{ error }}
-//     <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
-//             aria-hidden="true">x</span></button>
-// </div>
-// {% endfor %}
-    // remove previous errors
-    var error_node = $("#docker_error");
-    error_node.hide()
-    while (error_node.firstChild) {
-        error_node.removeChild(error_node.lastChild);
-    }
-
-    for (var error of errors) {
-        curr_node = error_template(error);
-        error_node.append(curr_node);
-        var curr_obj = $(curr_node);
-        curr_obj.show();
-    }
-    error_node.show();
-}
 
 function start_container(container) {
     $('#docker_container').html('<div class="text-center"><i class="fas fa-circle-notch fa-spin fa-1x"></i></div>');
-    // console.log(container)
     $.get("/api/v1/container", { 'name': container })
     .done(function (result) {
-        // console.log(result)
         get_docker_status(container);
-        // ezal({
-        //     title: "Attention!",
-        //     body: "You can only revert a container once per 5 minutes! Please be patient.",
-        //     button: "Got it!"
-        // });
-        // $(get_docker_status(container));
-        // get_docker_status(container);
     }).fail(function (jqXHR, textStatus, errorThrown) {
-        // console.log(jqXHR.status)
-        // console.log(jqXHR.responseJSON)
         ezal({
             title: "Attention!",
             body: jqXHR.responseJSON["message"],
