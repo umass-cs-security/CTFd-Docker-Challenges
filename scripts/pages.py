@@ -209,6 +209,15 @@ def define_docker_import(app):
                 active_docker = docker
             else:
                 active_docker = DockerConfig()
+
+            if active_docker is None or active_docker.repositories is None:
+                errors.append("No valid docker registry configured, please check docker config!")
+                return render_template(
+                        "admin_docker_import.html",
+                        form=form,
+                        errors=errors,
+                    )
+            
             repos = active_docker.repositories.split(",")
             if len(repos) == 0:
                 errors.append(
