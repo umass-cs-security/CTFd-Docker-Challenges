@@ -134,6 +134,9 @@ def get_unavailable_ports(docker):
         headers={"Content-Type": "application/json"},
     )
     result = list()
+    if r.status_code == 500:
+        return []
+
     for i in r.json():
         if not i["Ports"] == []:
             for p in i["Ports"]:
@@ -189,6 +192,8 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
     }
     if params is not None:
         req_params.update(params)
+
+    res = None
     try:
         if docker.tls_enabled:
             cert = get_client_cert(docker)
@@ -198,7 +203,13 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
             }
             req_params.update(tls_params)
         res = http_func(**req_params)
-    except:
-        print(traceback.print_exc())
-        res = []
+    except Exception as e:
+        err_msg = f"Unexpected error when issue request to {url}. Detail: {e}"
+        print(err_msg)
+        # print(traceback.print_exc())
+        if res is None:
+            res = requests.Response()
+            res._content = json.dumps({"code": 500, "message": err_msg}).encode("utf-8")
+            res.status_code = 500
+            res.headers = headers
     return res

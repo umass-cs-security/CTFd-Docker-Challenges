@@ -1,6 +1,8 @@
 import hashlib
 import json
 import random
+
+import flask
 from CTFd.plugins.docker_challenges.scripts.const import (
     Default_Headers,
     DOCKER_CHALLENGES_LABEL,
@@ -45,8 +47,12 @@ def delete_container(docker, container_name, headers=None):
         headers=headers,
     )
     if resp.status_code == 500:
-        print(f"Fail to Delete container: {container_name}. {resp.json()['message']}")
-        return False, resp.json()["message"]
+        if isinstance(resp, flask.Response) :
+            msg = resp.json["message"]
+        else:
+            msg = resp.json()["message"]
+        print(f"Fail to Delete container: {container_name}. {msg}")
+        return False, msg
     print(f"Deleted container: {container_name}")
     return True, resp
 
@@ -63,7 +69,11 @@ def delete_stopped_containers(docker, headers=None):
         headers=headers,
     )
     if resp.status_code == 500:
-        return False, resp.json()["message"]
+        if isinstance(resp, flask.Response) :
+            msg = resp.json["message"]
+        else:
+            msg = resp.json()["message"]
+        return False, msg
     return True, resp
 
 
@@ -111,41 +121,6 @@ def create_container(docker, image, team, team_indexing=None):
             },
         }
     )
-    # r = requests.post(
-    #     url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
-    #     cert=CERT,
-    #     verify=False,
-    #     data=data,
-    #     headers=headers,
-    # )
-    # create_res = do_request(
-    #     docker,
-    #     url=f"/containers/create?name={container_name}",
-    #     method="POST",
-    #     host=docker.enginename,
-    #     headers=headers,
-    #     data=data,
-    # )
-    # result = create_res.json()
-    # start_res = do_request(
-    #     docker,
-    #     url=f"/containers/{result['Id']}/start",
-    #     # url=f"/containers/create?name={container_name}",
-    #     method="POST",
-    #     host=docker.enginename,
-    #     headers=headers,
-    # )
-    # requests.post(
-    #     url=f"/containers/{result['Id']}/start",
-    #     cert=CERT,
-    #     verify=False,
-    #     headers=headers,
-    # )
-    # r = requests.post(
-    #     url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
-    #     data=data,
-    #     headers=headers,
-    # )
     create_res = do_request(
         docker,
         url=f"/containers/create?name={container_name}",
@@ -154,17 +129,20 @@ def create_container(docker, image, team, team_indexing=None):
         headers=Default_Headers,
         data=data,
     )
-    print(
-        create_res.request.method,
-        create_res.request.url,
-        create_res.status_code,
-        create_res.request.body,
-    )
+
+    if create_res.request is not None:
+        print(
+            create_res.request.method,
+            create_res.request.url,
+            create_res.status_code,
+            create_res.request.body,
+        )
+    else:
+        print("Error! Create container response does not contain request field, possible error(s) occured during the process.")
     result = create_res.json()
 
     create_status_code = create_res.status_code
 
-    print(result)
     if create_status_code == 201:
         ok, resp = start_container(docker, result["Id"])
         print(resp)
@@ -185,7 +163,7 @@ def create_container(docker, image, team, team_indexing=None):
         delete_container(docker, container_name)
         return (
             None,
-            f"{create_status_code} Internal Error. Please contact website administrator or Professor Parviz.",
+            f"{create_status_code} Internal Error. Please contact website administrator or Professor Parviz.\nDetail: {result['message']}",
         )
     elif create_status_code == 404:
         # 404: Image not found

@@ -108,9 +108,13 @@ def define_docker_admin(app):
                 b.client_key = None
             try:
                 # print(request.form.to_dict(flat=False))
-                b.repositories = ",".join(
-                    request.form.to_dict(flat=False)["repositories"]
-                )
+                dict_result = request.form.to_dict(flat=False)
+                if "repositories" in dict_result:
+                    b.repositories = ",".join(
+                        request.form.to_dict(flat=False)["repositories"]
+                    )
+                else:
+                    b.repositories = ""
                 # print(b.repositories)
             except:
                 print(traceback.print_exc())
@@ -129,9 +133,12 @@ def define_docker_admin(app):
             form.repositories.choices = [(d, d) for d in repos]
         dconfig = DockerConfig.query.first()
         try:
-            selected_repos = dconfig.repositories
-            if selected_repos == None:
+            if dconfig is None:
                 selected_repos = list()
+            else:
+                selected_repos = dconfig.repositories
+                if selected_repos == None:
+                    selected_repos = list()
         # selected_repos = dconfig.repositories.split(',')
         except:
             print(traceback.print_exc())
