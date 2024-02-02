@@ -13,6 +13,9 @@ from CTFd.plugins.docker_challenges.scripts.func import (
     get_required_ports,
     get_unavailable_ports,
 )
+from CTFd.plugins.docker_challenges.scripts.model import (
+    DockerChallenge,
+)
 
 
 def start_container(docker, container_name, headers=None):
@@ -47,7 +50,7 @@ def delete_container(docker, container_name, headers=None):
         headers=headers,
     )
     if resp.status_code == 500:
-        if isinstance(resp, flask.Response) :
+        if isinstance(resp, flask.Response):
             msg = resp.json["message"]
         else:
             msg = resp.json()["message"]
@@ -69,7 +72,7 @@ def delete_stopped_containers(docker, headers=None):
         headers=headers,
     )
     if resp.status_code == 500:
-        if isinstance(resp, flask.Response) :
+        if isinstance(resp, flask.Response):
             msg = resp.json["message"]
         else:
             msg = resp.json()["message"]
@@ -77,9 +80,7 @@ def delete_stopped_containers(docker, headers=None):
     return True, resp
 
 
-# referred api: https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerCreate
-def create_container(docker, image, team, team_indexing=None):
-    delete_stopped_containers(docker)
+def create_container(docker, image, active_flag, team, team_indexing=None):
     needed_ports = get_required_ports(docker, image)
     if needed_ports is None:
         return None, "No port(s) exposed, Please re-check the host docker image!"
@@ -105,6 +106,7 @@ def create_container(docker, image, team, team_indexing=None):
     for i in needed_ports:
         ports[i] = {}
         bindings[i] = [{"HostPort": tmp_ports.pop()}]
+
     data = json.dumps(
         {
             "Image": f"{docker.hostname}/{image}",  # image is under the registry
@@ -119,6 +121,7 @@ def create_container(docker, image, team, team_indexing=None):
                     "Type": DOCKER_CHALLENGES_LABEL,
                 },
             },
+            "Env": [f"FLAG={active_flag}"],
         }
     )
     create_res = do_request(
@@ -130,7 +133,6 @@ def create_container(docker, image, team, team_indexing=None):
         data=data,
     )
 
-
     if create_res.request is not None:
         print(
             create_res.request.method,
@@ -139,7 +141,9 @@ def create_container(docker, image, team, team_indexing=None):
             create_res.request.body,
         )
     else:
-        print("Error! Create container response does not contain request field, possible error(s) occured during the process.")
+        print(
+            "Error! Create container response does not contain request field, possible error(s) occured during the process."
+        )
     result = create_res.json()
 
     create_status_code = create_res.status_code
@@ -167,25 +171,28 @@ def create_container(docker, image, team, team_indexing=None):
             team_indexing = 0
         # increment md5 index by one to avoid name conflit
         team_indexing += 1
-        return create_container(docker, image, team, team_indexing)
-    # name conflicts are not handled properly
-    # print(r.request.method, r.request.url, r.request.body)
-    # result = r.json()
-    # print(result)
-    # # name conflicts are not handled properly
-    # s = requests.post(
-    #     url="%s/containers/%s/start" % (URL_TEMPLATE, result["Id"]), headers=headers
-    # )
-    # return result, data
+        return create_container(docker, image, random_flag_suffix, team, team_indexing)
 
 
-# def delete_container(docker, instance_id):
-#     headers = {"Content-Type": "application/json"}
-#     do_request(
-#         docker,
-#         f"/containers/{instance_id}?force=true",
-#         host=docker.enginename,
-#         headers=headers,
-#         method="DELETE",
-#     )
-#     return True
+def create_containers(
+    docker, verified_image_names, active_flag, team, team_indexing=None
+):
+    delete_stopped_containers(docker)
+    verified_image_names = verified_image_names.lower().split(",")
+
+    result = []
+    err_payload = None
+    for curr_image in verified_image_names:
+        created_info, payload = create_container(
+            docker, curr_image, active_flag, team, team_indexing
+        )
+        if created_info is None:
+            # print("Error during creating container: ", payload)
+            err_payload = payload
+            break
+        result.append((created_info, payload))
+
+    if err_payload is not None:
+        delete_stopped_containers(docker)
+        return [(None, err_payload)]
+    return result

@@ -1,18 +1,24 @@
 from CTFd.models import db
 from CTFd.plugins.docker_challenges.scripts.container import (
-    create_container,
+    create_containers,
     delete_container,
 )
-from CTFd.plugins.docker_challenges.scripts.func import VerifyImagesInRegistry
+from CTFd.plugins.docker_challenges.scripts.func import (
+    VerifyImagesInRegistry,
+    flag_generator,
+)
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallengeTracker,
+    DockerChallenge,
     DockerConfig,
 )
+from CTFd.models import Flags
 from CTFd.utils.decorators import authed_only
 
 from CTFd.utils.user import get_current_team
 from CTFd.utils.user import get_current_user
 from CTFd.utils.config import is_teams_mode
+
 
 from flask_restx import Namespace, Resource
 from flask import request, abort
@@ -35,17 +41,21 @@ class ContainerAPI(Resource):
     # I wish this was Post... Issues with API/CSRF and whatnot. Open to a Issue solving this.
     def get(self):
         # name should in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
-        container = request.args.get("name")
-        if not container:
+        container_names = request.args.get("name")
+        if not container_names:
             return abort(403, description="Image Not Specified in Request!")
         docker = DockerConfig.query.filter_by(id=1).first()
-        containers = DockerChallengeTracker.query.all()
+        existing_containers = DockerChallengeTracker.query.all()
 
-        results = VerifyImagesInRegistry(docker, container)
+        results = VerifyImagesInRegistry(docker, container_names)
         err_msgs = []
-        for ok, container, error_msg in results:
+        verified_images = []
+        for ok, verified_image, error_msg in results:
             if not ok:
                 err_msgs.append(error_msg)
+                continue
+            verified_images.append(verified_image)
+
         if len(err_msgs) > 0:
             err_msgs = ",\n".join(err_msgs)
             return abort(
@@ -53,10 +63,12 @@ class ContainerAPI(Resource):
                 description=err_msgs,
             )
 
+        verified_image_names = ",".join(verified_images)
+
         if is_teams_mode():
             session = get_current_team()
             # First we'll delete all old docker containers (+2 hours)
-            for i in containers:
+            for i in existing_containers:
                 if (
                     int(session.id) == int(i.team_id)
                     and (unix_time(datetime.utcnow()) - int(i.timestamp)) >= 7200
@@ -68,12 +80,12 @@ class ContainerAPI(Resource):
                     db.session.commit()
             check = (
                 DockerChallengeTracker.query.filter_by(team_id=session.id)
-                .filter_by(docker_image=container)
+                .filter_by(docker_image=verified_image_names)
                 .first()
             )
         else:
             session = get_current_user()
-            for i in containers:
+            for i in existing_containers:
                 if (
                     int(session.id) == int(i.user_id)
                     and (unix_time(datetime.utcnow()) - int(i.timestamp)) >= 7200
@@ -86,7 +98,7 @@ class ContainerAPI(Resource):
             # check is none => docker image is running
             check = (
                 DockerChallengeTracker.query.filter_by(user_id=session.id)
-                .filter_by(docker_image=container)
+                .filter_by(docker_image=verified_image_names)
                 .first()
             )
         # If this container is already created, we don't need another one.
@@ -103,25 +115,45 @@ class ContainerAPI(Resource):
             delete_container(docker, check.instance_id)
             if is_teams_mode():
                 DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(
-                    docker_image=container
+                    docker_image=verified_image_names
                 ).delete()
             else:
                 DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(
-                    docker_image=container
+                    docker_image=verified_image_names
                 ).delete()
             db.session.commit()
-        created_info, payload = create_container(docker, container, session.name)
-        if created_info is None:
-            # print("Error during creating container: ", payload)
-            return abort(403, payload)
-        ports = json.loads(payload)["HostConfig"]["PortBindings"].values()
-        print(
-            f"Adding new container: <{container}>:<{created_info['Id']}> for <{session.name}>"
+
+        curr_docker_chal: DockerChallenge = DockerChallenge.query.filter_by(
+            docker_image=verified_image_names
+        ).first()
+        if curr_docker_chal is None:
+            return abort(
+                403,
+                f"Specified images are selected in docker config: <{verified_image_names}>",
+            )
+
+        generated_flag = ""
+        if curr_docker_chal.flags is None or len(curr_docker_chal.flags) == 0:
+            generated_flag = flag_generator(size=16)
+        else:
+            active_static_flag: Flags = curr_docker_chal.flags[0]
+            generated_flag = flag_generator(prefix=active_static_flag.content + "_")
+
+        create_results = create_containers(
+            docker, verified_image_names, generated_flag, session.name
         )
+        ports = []
+        for created_info, payload in create_results:
+            if created_info is None:
+                # print("Error during creating container: ", payload)
+                return abort(403, payload)
+            ports.append(json.loads(payload)["HostConfig"]["PortBindings"].values())
+        print(f"Adding new container: <{verified_image_names}> for <{session.name}>")
         entry = DockerChallengeTracker(
             team_id=session.id if is_teams_mode() else None,
             user_id=session.id if not is_teams_mode() else None,
-            docker_image=container,
+            docker_image=verified_image_names,
+            container_flag=generated_flag,
             timestamp=unix_time(datetime.utcnow()),
             revert_time=unix_time(datetime.utcnow()) + 300,
             instance_id=created_info["Id"],
@@ -129,7 +161,7 @@ class ContainerAPI(Resource):
             host=str(docker.enginename).split(":")[0],
         )
         print(
-            f"Added new container: <{container}>:<{created_info['Id']}> for <{session.name}> at {entry.timestamp}"
+            f"Added new container: <{verified_image_names}> for <{session.name}> at {entry.timestamp}"
         )
         db.session.add(entry)
         db.session.commit()

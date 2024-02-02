@@ -1,4 +1,6 @@
 import json
+import random
+import string
 import tempfile
 import traceback
 from typing import Any, Dict, List, Tuple
@@ -73,8 +75,9 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
     return (False, None, IMAGE_NOT_EXIST + " " + ADMINISTRATIVE)
 
 
-
-def VerifyImagesInRegistry(docker, target_container_names: str) -> List[Tuple[bool, str, str]]:
+def VerifyImagesInRegistry(
+    docker, target_container_names: str
+) -> List[Tuple[bool, str, str]]:
     """
     return (
         whether image in registry,
@@ -87,7 +90,6 @@ def VerifyImagesInRegistry(docker, target_container_names: str) -> List[Tuple[bo
     for elem in target_container_names:
         result.append(VerifyImageInRegistry(docker, elem))
     return result
-    
 
 
 def get_client_cert(docker):
@@ -226,3 +228,14 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
             res.status_code = 500
             res.headers = headers
     return res
+
+
+def flag_generator(
+    prefix=None, suffix=None, size=8, chars=string.ascii_uppercase + string.digits
+) -> str:
+    generated = "".join(random.SystemRandom().choice(chars) for _ in range(size))
+    if prefix is not None:
+        generated = prefix + generated
+    if suffix is not None:
+        generated += suffix
+    return generated

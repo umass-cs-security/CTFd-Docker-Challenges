@@ -26,15 +26,13 @@ class DockerStatus(Resource):
 
     @authed_only
     def get(self):
-        
+
         docker = DockerConfig.query.filter_by(id=1).first()
 
         target_challenge_names = request.args.get("name", "").lower()
         verified_names = []
         if target_challenge_names != "":
-            results = VerifyImagesInRegistry(
-                docker, target_challenge_names
-            )
+            results = VerifyImagesInRegistry(docker, target_challenge_names)
             for ok, curr_target_challenge_name, error_msg in results:
                 # print(ok, target, error_msg)
                 if not ok:
@@ -55,21 +53,21 @@ class DockerStatus(Resource):
         data = list()
         for curr_challenge in tracker:
             current_data = {
-                    "id": curr_challenge.id,
-                    "team_id": curr_challenge.team_id,
-                    "user_id": curr_challenge.user_id,
-                    "docker_image": curr_challenge.docker_image,
-                    "timestamp": curr_challenge.timestamp,
-                    "revert_time": curr_challenge.revert_time,
-                    "instance_id": curr_challenge.instance_id,
-                    "ports": curr_challenge.ports.split(","),
-                    "host": str(docker.hostname).split(":")[0],
-                }
+                "id": curr_challenge.id,
+                "team_id": curr_challenge.team_id,
+                "user_id": curr_challenge.user_id,
+                "docker_image": curr_challenge.docker_image,
+                "timestamp": curr_challenge.timestamp,
+                "revert_time": curr_challenge.revert_time,
+                "instance_id": curr_challenge.instance_id,
+                "ports": curr_challenge.ports.split(","),
+                "host": str(docker.hostname).split(":")[0],
+            }
             if len(verified_names) == 0:
                 # need to return all current user info
-                data.append( current_data )
+                data.append(current_data)
             elif curr_challenge.docker_image in verified_names:
                 # has valid verified names
-                data.append( current_data )
+                data.append(current_data)
 
         return {"success": True, "data": data}

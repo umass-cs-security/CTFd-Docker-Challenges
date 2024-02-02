@@ -40,6 +40,7 @@ class DockerChallengeTracker(db.Model):
     team_id = db.Column("team_id", db.String(64), index=True)
     user_id = db.Column("user_id", db.String(64), index=True)
     docker_image = db.Column("docker_image", db.String(64), index=True)
+    container_flag = db.Column("container_flag", db.String(64), index=True)
     timestamp = db.Column("timestamp", db.Integer, index=True)
     revert_time = db.Column("revert_time", db.Integer, index=True)
     instance_id = db.Column("instance_id", db.String(128), index=True)

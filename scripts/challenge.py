@@ -1,4 +1,5 @@
 import json
+from typing import List
 from flask import Blueprint
 from CTFd.models import (
     ChallengeFiles,
@@ -17,7 +18,7 @@ from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallengeTracker,
     DockerConfig,
 )
-from CTFd.plugins.flags import get_flag_class
+from CTFd.plugins.flags import get_flag_class, CTFdStaticFlag
 from CTFd.utils.config import is_teams_mode
 from CTFd.utils.uploads import delete_file
 from CTFd.utils.user import get_ip
@@ -145,9 +146,16 @@ class DockerChallengeType(BaseChallenge):
         # print(request.get_json())
         # print(data)
         submission = data["submission"].strip()
-        flags = Flags.query.filter_by(challenge_id=challenge.id).all()
+        flags: List[Flags] = Flags.query.filter_by(challenge_id=challenge.id).all()
         for flag in flags:
-            if get_flag_class(flag.type).compare(flag, submission):
+            flag_compare_type = get_flag_class(flag.type)
+            if isinstance(flag_compare_type, CTFdStaticFlag):
+                curr_chal: DockerChallengeTracker = (
+                    DockerChallengeTracker.query.filter_by(id=challenge.id).all()
+                )
+                if flag_compare_type.compare(flag, submission, curr_chal):
+                    return True, "Correct"
+            elif flag_compare_type.compare(flag, submission):
                 return True, "Correct"
         return False, "Incorrect"
 
@@ -183,7 +191,7 @@ class DockerChallengeType(BaseChallenge):
                 )
             delete_container(docker, docker_containers.instance_id)
             DockerChallengeTracker.query.filter_by(
-                inst4ance_id=docker_containers.instance_id
+                instance_id=docker_containers.instance_id
             ).delete()
         except:
             pass

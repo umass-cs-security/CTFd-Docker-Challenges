@@ -122,7 +122,7 @@ def define_docker_admin(app):
             db.session.add(b)
             db.session.commit()
             docker = DockerConfig.query.filter_by(id=1).first()
-        
+
         try:
             repos = get_repositories(docker)
         except:
@@ -165,9 +165,7 @@ def define_docker_status(app):
         docker_tracker = DockerChallengeTracker.query.all()
         target_challenge_names = request.args.get("name", "").lower()
         if target_challenge_names != "":
-            results = VerifyImagesInRegistry(
-                docker_config, target_challenge_names
-            )
+            results = VerifyImagesInRegistry(docker_config, target_challenge_names)
             verified_names = []
             for ok, curr_target_challenge_name, error_msg in results:
                 # print(ok, target, error_msg)
@@ -225,12 +223,14 @@ def define_docker_import(app):
                 active_docker = DockerConfig()
 
             if active_docker is None or active_docker.repositories is None:
-                errors.append("No valid docker registry configured, please check docker config!")
+                errors.append(
+                    "No valid docker registry configured, please check docker config!"
+                )
                 return render_template(
-                        "admin_docker_import.html",
-                        form=form,
-                        errors=errors,
-                    )
+                    "admin_docker_import.html",
+                    form=form,
+                    errors=errors,
+                )
 
             repos = list()
             if active_docker.repositories is not None:
@@ -415,7 +415,7 @@ def define_docker_import(app):
                         h = Hints(
                             challenge_id=new_challenge_id,
                             content=hint["content"],
-                            cost=hint["cost"]
+                            cost=hint["cost"],
                         )
                         db.session.add(h)
                         db.session.commit()
