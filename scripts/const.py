@@ -10,3 +10,7 @@ INVALID_FORMAT = "Invalid Parameter Format Specified."
 IMAGE_NOT_EXIST = "Image does not Exist in Docker Registry!"
 
 ALLOWED_EXTENSIONS = ["yml", "yaml", "xml", "md"]
+
+CTF_FLAG_FORMAT = "CTF_SDaT{{FLAG}}"
+CTF_FLAG_PREFIX = "CTF_SDaT{"
+CTF_FLAG_SUFFIX = "}"

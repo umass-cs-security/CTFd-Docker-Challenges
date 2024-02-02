@@ -44,7 +44,7 @@ class ContainerAPI(Resource):
         container_names = request.args.get("name")
         if not container_names:
             return abort(403, description="Image Not Specified in Request!")
-        docker = DockerConfig.query.filter_by(id=1).first()
+        docker: DockerConfig = DockerConfig.query.filter_by(id=1).first()
         existing_containers = DockerChallengeTracker.query.all()
 
         results = VerifyImagesInRegistry(docker, container_names)
@@ -64,6 +64,37 @@ class ContainerAPI(Resource):
             )
 
         verified_image_names = ",".join(verified_images)
+        if verified_image_names == "":
+            return abort(
+                406,
+                description=f"No valid image name was specified: {container_names}",
+            )
+
+        verified_image_names_with_docker_host = ""
+        for verified_image in verified_images:
+            curr_verified_image_components = verified_image.split(":")
+            # remove the last element which is the tag of the image
+            curr_verified_image_name = ":".join(curr_verified_image_components[:-1])
+            verified_image_names_with_docker_host +=  f"{docker.hostname}/{curr_verified_image_name}" 
+
+
+        curr_docker_chal: DockerChallenge = DockerChallenge.query.filter_by(
+            docker_image=verified_image_names_with_docker_host
+        ).first()
+        if curr_docker_chal is None:
+            chals = DockerChallenge.query.all()
+            contained = ";;".join([elem.docker_image for elem in chals])
+            return abort(
+                403,
+                description=f"Specified images are not selected in docker config: <{container_names}> -> <{verified_image_names_with_docker_host}>\n{contained}",
+            )
+
+        generated_flag = ""
+        if curr_docker_chal.flags is None or len(curr_docker_chal.flags) == 0:
+            generated_flag = flag_generator(size=16)
+        else:
+            active_static_flag: Flags = curr_docker_chal.flags[0]
+            generated_flag = flag_generator(prefix=active_static_flag.content)
 
         if is_teams_mode():
             session = get_current_team()
@@ -123,21 +154,7 @@ class ContainerAPI(Resource):
                 ).delete()
             db.session.commit()
 
-        curr_docker_chal: DockerChallenge = DockerChallenge.query.filter_by(
-            docker_image=verified_image_names
-        ).first()
-        if curr_docker_chal is None:
-            return abort(
-                403,
-                f"Specified images are selected in docker config: <{verified_image_names}>",
-            )
-
-        generated_flag = ""
-        if curr_docker_chal.flags is None or len(curr_docker_chal.flags) == 0:
-            generated_flag = flag_generator(size=16)
-        else:
-            active_static_flag: Flags = curr_docker_chal.flags[0]
-            generated_flag = flag_generator(prefix=active_static_flag.content + "_")
+        
 
         create_results = create_containers(
             docker, verified_image_names, generated_flag, session.name
@@ -147,7 +164,7 @@ class ContainerAPI(Resource):
             if created_info is None:
                 # print("Error during creating container: ", payload)
                 return abort(403, payload)
-            ports.append(json.loads(payload)["HostConfig"]["PortBindings"].values())
+            ports.extend(json.loads(payload)["HostConfig"]["PortBindings"].values())
         print(f"Adding new container: <{verified_image_names}> for <{session.name}>")
         entry = DockerChallengeTracker(
             team_id=session.id if is_teams_mode() else None,

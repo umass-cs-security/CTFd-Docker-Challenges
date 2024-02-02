@@ -13,6 +13,9 @@ from CTFd.plugins.docker_challenges.scripts.const import (
     INVALID_FORMAT,
     INVALID_REGISTRY_SPECIFIED,
     REGISTRY_EMPTY,
+    CTF_FLAG_FORMAT,
+    CTF_FLAG_PREFIX,
+    CTF_FLAG_SUFFIX
 )
 
 
@@ -231,11 +234,18 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
 
 
 def flag_generator(
-    prefix=None, suffix=None, size=8, chars=string.ascii_uppercase + string.digits
+    prefix:str=None, suffix:str=None, size=8, chars=string.ascii_uppercase + string.digits
 ) -> str:
     generated = "".join(random.SystemRandom().choice(chars) for _ in range(size))
     if prefix is not None:
-        generated = prefix + generated
+        need_flag_format = False
+        if prefix.startswith(CTF_FLAG_PREFIX) and prefix.endswith(CTF_FLAG_SUFFIX):
+            prefix = prefix.lstrip(CTF_FLAG_PREFIX).rstrip(CTF_FLAG_SUFFIX)
+            need_flag_format = True
+        generated = prefix + "_" + generated
     if suffix is not None:
-        generated += suffix
+        generated += "_" + suffix
+
+    if need_flag_format:
+        return CTF_FLAG_PREFIX + generated + CTF_FLAG_SUFFIX
     return generated

@@ -164,9 +164,10 @@ def define_docker_status(app):
         docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
         target_challenge_names = request.args.get("name", "").lower()
+        
+        verified_names = []
         if target_challenge_names != "":
             results = VerifyImagesInRegistry(docker_config, target_challenge_names)
-            verified_names = []
             for ok, curr_target_challenge_name, error_msg in results:
                 # print(ok, target, error_msg)
                 if not ok:

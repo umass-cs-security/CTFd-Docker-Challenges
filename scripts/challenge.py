@@ -141,19 +141,25 @@ class DockerChallengeType(BaseChallenge):
         :param request: The request the user submitted
         :return: (boolean, string)
         """
-
         data = request.form or request.get_json()
         # print(request.get_json())
-        # print(data)
+        print(data)
         submission = data["submission"].strip()
         flags: List[Flags] = Flags.query.filter_by(challenge_id=challenge.id).all()
         for flag in flags:
             flag_compare_type = get_flag_class(flag.type)
-            if isinstance(flag_compare_type, CTFdStaticFlag):
+            print("pass1", flag_compare_type, isinstance(flag_compare_type, CTFdStaticFlag))
+            if flag_compare_type == CTFdStaticFlag:
                 curr_chal: DockerChallengeTracker = (
-                    DockerChallengeTracker.query.filter_by(id=challenge.id).all()
+                    DockerChallengeTracker.query.filter_by(id=challenge.id).first()
                 )
-                if flag_compare_type.compare(flag, submission, curr_chal):
+                [print(elem.id, elem.docker_image) for elem in DockerChallengeTracker.query.all()]
+                print(curr_chal)
+                if curr_chal is None:
+                    return False, "Incorrect"
+                print("pass2",curr_chal.container_flag)
+                print("pass3", submission)
+                if flag_compare_type.compare(flag, submission, curr_chal.container_flag):
                     return True, "Correct"
             elif flag_compare_type.compare(flag, submission):
                 return True, "Correct"

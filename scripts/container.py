@@ -171,7 +171,7 @@ def create_container(docker, image, active_flag, team, team_indexing=None):
             team_indexing = 0
         # increment md5 index by one to avoid name conflit
         team_indexing += 1
-        return create_container(docker, image, random_flag_suffix, team, team_indexing)
+        return create_container(docker, image, active_flag, team, team_indexing)
 
 
 def create_containers(

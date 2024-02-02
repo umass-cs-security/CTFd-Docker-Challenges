@@ -78,4 +78,5 @@ class DockerImportForm(BaseForm):
 class DockerChallenge(Challenges):
     __mapper_args__ = {"polymorphic_identity": "docker"}
     id = db.Column(None, db.ForeignKey("challenges.id"), primary_key=True)
+    # in format {docker registry host}:{docker registry port}/{image name} (no tag)
     docker_image = db.Column(db.String(128), index=True)
