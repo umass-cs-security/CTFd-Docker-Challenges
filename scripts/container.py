@@ -91,7 +91,7 @@ def create_container(docker, image, team, team_indexing=None):
         team = hashlib.md5(team.encode("utf-8")).hexdigest()[
             team_indexing : team_indexing + 10
         ]
-    container_name = "%s_%s" % (image.split(":")[1], team)
+    container_name = "%s_%s" % (image.split(":")[0], team)
     assigned_ports = dict()
     for i in needed_ports:
         while True:
@@ -130,6 +130,7 @@ def create_container(docker, image, team, team_indexing=None):
         data=data,
     )
 
+
     if create_res.request is not None:
         print(
             create_res.request.method,
@@ -145,18 +146,9 @@ def create_container(docker, image, team, team_indexing=None):
 
     if create_status_code == 201:
         ok, resp = start_container(docker, result["Id"])
-        print(resp)
         if not ok:
             delete_container(docker, container_name)
             return None, resp
-        # do_request(
-        #     docker,
-        #     url=f"/containers/{result['Id']}/start",
-        #     # url=f"/containers/create?name={container_name}",
-        #     method="POST",
-        #     host=docker.enginename,
-        #     headers=headers,
-        # )
         return result, data
     elif create_status_code == 500 or create_status_code == 400:
         # 400: bad parameter, 500: internal error

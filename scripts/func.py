@@ -1,7 +1,7 @@
 import json
 import tempfile
 import traceback
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 import requests
 
 from CTFd.plugins.docker_challenges.scripts.const import (
@@ -48,6 +48,7 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
     target_registry_name = "/".join(target_container_name_components[:-1])
 
     if target_registry_name != docker.hostname:
+        print(target_container_name, docker.hostname)
         return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
 
     target_container_name = target_container_name_components[-1]
@@ -70,6 +71,23 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
         if target_image in repo_tag:
             return True, repo_tag, None
     return (False, None, IMAGE_NOT_EXIST + " " + ADMINISTRATIVE)
+
+
+
+def VerifyImagesInRegistry(docker, target_container_names: str) -> List[Tuple[bool, str, str]]:
+    """
+    return (
+        whether image in registry,
+        image name if necessary,
+        error msg,
+    )
+    """
+    target_container_names = target_container_names.lower().split(",")
+    result = []
+    for elem in target_container_names:
+        result.append(VerifyImageInRegistry(docker, elem))
+    return result
+    
 
 
 def get_client_cert(docker):
@@ -99,7 +117,7 @@ def get_repositories(docker, with_tags=False, expected_repos=None):
     res = do_request(docker, "/v2/_catalog", host=docker.hostname)
     result = list()
     if res is None or "repositories" not in res.json():
-        return None
+        return result
 
     for curr_repo in res.json()["repositories"]:
         if expected_repos is not None and len(expected_repos) > 0:
@@ -109,20 +127,15 @@ def get_repositories(docker, with_tags=False, expected_repos=None):
             tag_res = do_request(
                 docker, f"/v2/{curr_repo}/manifests/latest", host=docker.hostname
             )
-            curr_tag = tag_res.json()["tag"]
+            curr_manifest = tag_res.json()
+            if "tag" not in curr_manifest:
+                print("Error manifest:", curr_manifest)
+                continue
+            curr_tag = curr_manifest["tag"]
             curr_result = f"{curr_repo}:{curr_tag}"
             result.append(curr_result)
         else:
             result.append(curr_repo)
-
-        # if not i['RepoTags'][0].split(':')[0] == '<none>':
-        #     if expected_repos is not None and len(expected_repos) > 0:
-        #         if not i['RepoTags'][0].split(':')[0] in repos:
-        #             continue
-        #     if not tags:
-        #         result.append(i['RepoTags'][0].split(':')[0])
-        #     else:
-        #         result.append(i['RepoTags'][0])
     return list(set(result))
 
 

@@ -3,7 +3,7 @@ from CTFd.plugins.docker_challenges.scripts.container import (
     create_container,
     delete_container,
 )
-from CTFd.plugins.docker_challenges.scripts.func import VerifyImageInRegistry
+from CTFd.plugins.docker_challenges.scripts.func import VerifyImagesInRegistry
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallengeTracker,
     DockerConfig,
@@ -41,11 +41,16 @@ class ContainerAPI(Resource):
         docker = DockerConfig.query.filter_by(id=1).first()
         containers = DockerChallengeTracker.query.all()
 
-        ok, container, error_msg = VerifyImageInRegistry(docker, container)
-        if not ok:
+        results = VerifyImagesInRegistry(docker, container)
+        err_msgs = []
+        for ok, container, error_msg in results:
+            if not ok:
+                err_msgs.append(error_msg)
+        if len(err_msgs) > 0:
+            err_msgs = ",\n".join(err_msgs)
             return abort(
                 405,
-                description=error_msg,
+                description=err_msgs,
             )
 
         if is_teams_mode():

@@ -9,7 +9,7 @@ from CTFd.plugins.docker_challenges.scripts.challenge import DockerChallengeType
 from CTFd.plugins.docker_challenges.scripts.func import (
     allowed_file,
     get_repositories,
-    VerifyImageInRegistry,
+    VerifyImagesInRegistry,
 )
 from CTFd.plugins.docker_challenges.scripts.const import (
     ALLOWED_EXTENSIONS,
@@ -122,11 +122,11 @@ def define_docker_admin(app):
             db.session.add(b)
             db.session.commit()
             docker = DockerConfig.query.filter_by(id=1).first()
+        
         try:
             repos = get_repositories(docker)
         except:
             print(traceback.print_exc())
-            repos = list()
         if len(repos) == 0:
             form.repositories.choices = [("ERROR", "Failed to Connect to Docker")]
         else:
@@ -166,12 +166,13 @@ def define_docker_status(app):
         target_challenge_name = request.args.get("name", "").lower()
 
         if target_challenge_name != "":
-            ok, target_challenge_name, error_msg = VerifyImageInRegistry(
+            results = VerifyImagesInRegistry(
                 docker_config, target_challenge_name
             )
-            if not ok:
-                # if not ok, just consider this as invalid status query, i.e., return no result
-                return render_template("admin_docker_status.html", dockers=[])
+            for ok, target_challenge_name, error_msg in results:
+                if not ok:
+                    # if not ok, just consider this as invalid status query, i.e., return no result
+                    return render_template("admin_docker_status.html", dockers=[])
 
         for curr_tracked_challenge in docker_tracker:
             curr_tracked_challenge: DockerChallengeTracker
@@ -224,8 +225,10 @@ def define_docker_import(app):
                         form=form,
                         errors=errors,
                     )
-            
-            repos = active_docker.repositories.split(",")
+
+            repos = list()
+            if active_docker.repositories is not None:
+                repos = active_docker.repositories.split(",")
             if len(repos) == 0:
                 errors.append(
                     "No valid repository selected in docker config. "
@@ -398,18 +401,20 @@ def define_docker_import(app):
                     and new_challenge_update_dict["hints"] is not None
                 ):
                     hints = [
-                        hint.strip()
+                        hint
                         for hint in new_challenge_update_dict["hints"]
                         if hint is not None
                     ]
                     for hint in hints:
                         h = Hints(
                             challenge_id=new_challenge_id,
-                            content=hint,
+                            content=hint["content"],
+                            cost=hint["cost"]
                         )
                         db.session.add(h)
                         db.session.commit()
             except Exception as e:
+                print(traceback.print_exc())
                 errors.append(
                     f"Unexpected Error during creating (updating necessary contents) new challenge: {e}"
                 )

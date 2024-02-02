@@ -22,7 +22,7 @@ class DockerAPI(Resource):
         images = get_repositories(
             docker, with_tags=True, expected_repos=docker.repositories
         )
-        if images:
+        if images is not None:
             data = list()
             for i in images:
                 data.append({"name": i})
