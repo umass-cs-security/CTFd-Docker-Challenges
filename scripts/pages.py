@@ -163,24 +163,30 @@ def define_docker_status(app):
     def docker_admin():
         docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
-        target_challenge_name = request.args.get("name", "").lower()
-
-        if target_challenge_name != "":
+        target_challenge_names = request.args.get("name", "").lower()
+        if target_challenge_names != "":
             results = VerifyImagesInRegistry(
-                docker_config, target_challenge_name
+                docker_config, target_challenge_names
             )
-            for ok, target_challenge_name, error_msg in results:
+            verified_names = []
+            for ok, curr_target_challenge_name, error_msg in results:
+                # print(ok, target, error_msg)
                 if not ok:
-                    # if not ok, just consider this as invalid status query, i.e., return no result
-                    return render_template("admin_docker_status.html", dockers=[])
-
+                    # if not ok, ignore current result
+                    # return render_template("admin_docker_status.html", dockers=[])
+                    continue
+                verified_names.append(curr_target_challenge_name)
+            if len(verified_names) == 0:
+                # no need for filtering as no valid result is returned
+                return render_template("admin_docker_status.html", dockers=[])
+        verified_dockers = []
         for curr_tracked_challenge in docker_tracker:
             curr_tracked_challenge: DockerChallengeTracker
-            if target_challenge_name != "":
-                if curr_tracked_challenge.docker_image == target_challenge_name:
-                    target = curr_tracked_challenge.__dict__.copy()
-                    setattr(target, "requested", True)
-                    return render_template("admin_docker_status.html", dockers=[target])
+            if len(verified_names) > 0:
+                if curr_tracked_challenge.docker_image in verified_names:
+                    # target = curr_tracked_challenge.__dict__.copy()
+                    # setattr(target, "requested", True)
+                    verified_dockers.append(curr_tracked_challenge)
                 else:
                     continue
             if is_teams_mode():
@@ -190,8 +196,8 @@ def define_docker_status(app):
                 name = Users.query.filter_by(id=curr_tracked_challenge.user_id).first()
                 curr_tracked_challenge.user_id = name.name
 
-        if target_challenge_name != "":
-            return render_template("admin_docker_status.html", dockers=[])
+        if len(verified_names) > 0:
+            return render_template("admin_docker_status.html", dockers=verified_dockers)
 
         return render_template("admin_docker_status.html", dockers=docker_tracker)
 
