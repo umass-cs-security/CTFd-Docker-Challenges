@@ -37,6 +37,9 @@ class DockerChallengeTracker(db.Model):
     """
 
     id = db.Column(db.Integer, primary_key=True)
+    challenge_id = db.Column(
+        db.Integer, db.ForeignKey("challenges.id", ondelete="CASCADE")
+    )
     team_id = db.Column("team_id", db.String(64), index=True)
     user_id = db.Column("user_id", db.String(64), index=True)
     docker_image = db.Column("docker_image", db.String(64), index=True)

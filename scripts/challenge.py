@@ -20,6 +20,8 @@ from CTFd.plugins.docker_challenges.scripts.model import (
 )
 from CTFd.plugins.flags import get_flag_class, CTFdStaticFlag
 from CTFd.utils.config import is_teams_mode
+from CTFd.utils.user import get_current_team
+from CTFd.utils.user import get_current_user
 from CTFd.utils.uploads import delete_file
 from CTFd.utils.user import get_ip
 
@@ -143,22 +145,28 @@ class DockerChallengeType(BaseChallenge):
         """
         data = request.form or request.get_json()
         # print(request.get_json())
-        print(data)
         submission = data["submission"].strip()
         flags: List[Flags] = Flags.query.filter_by(challenge_id=challenge.id).all()
         for flag in flags:
             flag_compare_type = get_flag_class(flag.type)
-            print("pass1", flag_compare_type, isinstance(flag_compare_type, CTFdStaticFlag))
             if flag_compare_type == CTFdStaticFlag:
+                flag_compare_type: CTFdStaticFlag
+                filter_params = {
+                    "challenge_id": challenge.id,
+                }
+
+                if is_teams_mode():
+                    session = get_current_team()
+                    filter_params["team_id"] = session.id 
+                else:
+                    session = get_current_user()
+                    filter_params["user_id"] = session.id 
+                    
                 curr_chal: DockerChallengeTracker = (
-                    DockerChallengeTracker.query.filter_by(id=challenge.id).first()
+                    DockerChallengeTracker.query.filter_by(**filter_params).first()
                 )
-                [print(elem.id, elem.docker_image) for elem in DockerChallengeTracker.query.all()]
-                print(curr_chal)
                 if curr_chal is None:
                     return False, "Incorrect"
-                print("pass2",curr_chal.container_flag)
-                print("pass3", submission)
                 if flag_compare_type.compare(flag, submission, curr_chal.container_flag):
                     return True, "Correct"
             elif flag_compare_type.compare(flag, submission):

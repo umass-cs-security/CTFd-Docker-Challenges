@@ -240,12 +240,16 @@ def flag_generator(
     if prefix is not None:
         need_flag_format = False
         if prefix.startswith(CTF_FLAG_PREFIX) and prefix.endswith(CTF_FLAG_SUFFIX):
-            prefix = prefix.lstrip(CTF_FLAG_PREFIX).rstrip(CTF_FLAG_SUFFIX)
+            # print(f"Flag before stripping: '{prefix}'")
+            prefix = prefix[len(CTF_FLAG_PREFIX):-len(CTF_FLAG_SUFFIX)]
+            # print(f"Flag after stripping: '{prefix}'")
             need_flag_format = True
         generated = prefix + "_" + generated
     if suffix is not None:
         generated += "_" + suffix
 
     if need_flag_format:
-        return CTF_FLAG_PREFIX + generated + CTF_FLAG_SUFFIX
+        generated = CTF_FLAG_PREFIX + generated + CTF_FLAG_SUFFIX
+        # print(f"Flag after adding: '{generated}'")
+        return generated
     return generated

@@ -169,6 +169,7 @@ class ContainerAPI(Resource):
         entry = DockerChallengeTracker(
             team_id=session.id if is_teams_mode() else None,
             user_id=session.id if not is_teams_mode() else None,
+            challenge_id=curr_docker_chal.id,
             docker_image=verified_image_names,
             container_flag=generated_flag,
             timestamp=unix_time(datetime.utcnow()),

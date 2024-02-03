@@ -123,6 +123,7 @@ def define_docker_admin(app):
             db.session.commit()
             docker = DockerConfig.query.filter_by(id=1).first()
 
+        repos = []
         try:
             repos = get_repositories(docker)
         except:
@@ -164,7 +165,7 @@ def define_docker_status(app):
         docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
         target_challenge_names = request.args.get("name", "").lower()
-        
+
         verified_names = []
         if target_challenge_names != "":
             results = VerifyImagesInRegistry(docker_config, target_challenge_names)
