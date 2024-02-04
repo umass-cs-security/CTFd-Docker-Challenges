@@ -122,7 +122,7 @@ def define_docker_admin(app):
             db.session.add(active_docker)
             db.session.commit()
             docker = DockerConfig.query.filter_by(id=1).first()
-
+        
         repos = []
         try:
             repos = get_repositories(docker)

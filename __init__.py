@@ -23,9 +23,11 @@ import netifaces as ni
 def default_docker_config():
     docker = DockerConfig.query.filter_by(id=1).first()
     if docker is not None:
+        print("Cannot set defualt config for docker: has existing docker config!")
         return
 
     if "eth0" not in ni.interfaces():
+        print("Cannot set defualt config for docker: default network interface 'eth0' is unavilable!")
         return
 
     try:
@@ -37,7 +39,8 @@ def default_docker_config():
         )
         db.session.add(new_docker)
         db.session.commit()
-    except:
+    except Exception as e:
+        print(f"Cannot set defualt config for docker: Unexpected error: {e}")
         return
 
 
