@@ -75,8 +75,9 @@ class ContainerAPI(Resource):
             curr_verified_image_components = verified_image.split(":")
             # remove the last element which is the tag of the image
             curr_verified_image_name = ":".join(curr_verified_image_components[:-1])
-            verified_image_names_with_docker_host +=  f"{docker.hostname}/{curr_verified_image_name}" 
-
+            verified_image_names_with_docker_host += (
+                f"{docker.hostname}/{curr_verified_image_name}"
+            )
 
         curr_docker_chal: DockerChallenge = DockerChallenge.query.filter_by(
             docker_image=verified_image_names_with_docker_host
@@ -153,8 +154,6 @@ class ContainerAPI(Resource):
                     docker_image=verified_image_names
                 ).delete()
             db.session.commit()
-
-        
 
         create_results = create_containers(
             docker, verified_image_names, generated_flag, session.name

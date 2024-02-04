@@ -2,6 +2,8 @@ from CTFd.api import CTFd_API_v1
 from CTFd.plugins import register_plugin_assets_directory
 from CTFd.plugins.challenges import CHALLENGE_CLASSES
 from CTFd.plugins.docker_challenges.scripts.challenge import DockerChallengeType
+from CTFd.plugins.docker_challenges.scripts.model import DockerConfig, db
+
 from CTFd.plugins.docker_challenges.scripts.pages import (
     define_docker_admin,
     define_docker_import,
@@ -14,6 +16,30 @@ from CTFd.plugins.docker_challenges.scripts.namespace import (
     kill_container_namespace,
 )
 
+from netifaces import AF_INET
+import netifaces as ni
+
+
+def default_docker_config():
+    docker = DockerConfig.query.filter_by(id=1).first()
+    if docker is not None:
+        return
+
+    if "eth0" not in ni.interfaces():
+        return
+
+    try:
+        curr_addr = ni.interfaces()[AF_INET][0]["addr"]
+        new_docker = DockerConfig(
+            hostname=f"{curr_addr}:56156",
+            enginename=f"{curr_addr}:2375",
+            tls_enabled=False,
+        )
+        db.session.add(new_docker)
+        db.session.commit()
+    except:
+        return
+
 
 def load(app):
     app.db.create_all()
@@ -22,6 +48,7 @@ def load(app):
     define_docker_admin(app)
     define_docker_status(app)
     define_docker_import(app)
+    default_docker_config()
     CTFd_API_v1.add_namespace(docker_namespace, "/docker")
     CTFd_API_v1.add_namespace(container_namespace, "/container")
     CTFd_API_v1.add_namespace(active_docker_namespace, "/docker_status")

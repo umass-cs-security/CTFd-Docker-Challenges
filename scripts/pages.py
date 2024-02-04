@@ -55,13 +55,13 @@ def define_docker_admin(app):
     @admin_docker_config.route("/admin/docker_config", methods=["GET", "POST"])
     @admins_only
     def docker_config():
-        docker = DockerConfig.query.filter_by(id=1).first()
+        docker: DockerConfig = DockerConfig.query.filter_by(id=1).first()
         form = DockerConfigForm()
         if request.method == "POST":
-            if docker:
-                b = docker
+            if docker is not None:
+                active_docker = docker
             else:
-                b = DockerConfig()
+                active_docker = DockerConfig()
             try:
                 ca_cert = request.files["ca_cert"].stream.read()
             except werkzeug.exceptions.BadRequestKeyError as e:
@@ -90,36 +90,36 @@ def define_docker_admin(app):
                 client_key = ""
 
             if len(ca_cert) != 0:
-                b.ca_cert = ca_cert
+                active_docker.ca_cert = ca_cert
             if len(client_cert) != 0:
-                b.client_cert = client_cert
+                active_docker.client_cert = client_cert
             if len(client_key) != 0:
-                b.client_key = client_key
-            b.hostname = request.form["hostname"]
-            b.enginename = request.form["enginename"]
-            b.tls_enabled = request.form["tls_enabled"]
-            if b.tls_enabled == "True":
-                b.tls_enabled = True
+                active_docker.client_key = client_key
+            active_docker.hostname = request.form["hostname"]
+            active_docker.enginename = request.form["enginename"]
+            active_docker.tls_enabled = request.form["tls_enabled"]
+            if active_docker.tls_enabled == "True":
+                active_docker.tls_enabled = True
             else:
-                b.tls_enabled = False
-            if not b.tls_enabled:
-                b.ca_cert = None
-                b.client_cert = None
-                b.client_key = None
+                active_docker.tls_enabled = False
+            if not active_docker.tls_enabled:
+                active_docker.ca_cert = None
+                active_docker.client_cert = None
+                active_docker.client_key = None
             try:
                 # print(request.form.to_dict(flat=False))
                 dict_result = request.form.to_dict(flat=False)
                 if "repositories" in dict_result:
-                    b.repositories = ",".join(
+                    active_docker.repositories = ",".join(
                         request.form.to_dict(flat=False)["repositories"]
                     )
                 else:
-                    b.repositories = ""
-                # print(b.repositories)
+                    active_docker.repositories = ""
+                # print(active_docker.repositories)
             except:
                 print(traceback.print_exc())
-                b.repositories = None
-            db.session.add(b)
+                active_docker.repositories = None
+            db.session.add(active_docker)
             db.session.commit()
             docker = DockerConfig.query.filter_by(id=1).first()
 
@@ -215,15 +215,10 @@ def define_docker_import(app):
     @admin_docker_import.route("/admin/docker_import", methods=["GET", "POST"])
     @admins_only
     def docker_import():
-        docker = DockerConfig.query.filter_by(id=1).first()
+        active_docker = DockerConfig.query.filter_by(id=1).first()
         form = DockerImportForm()
         errors = []
         if request.method == "POST":
-            if docker:
-                active_docker = docker
-            else:
-                active_docker = DockerConfig()
-
             if active_docker is None or active_docker.repositories is None:
                 errors.append(
                     "No valid docker registry configured, please check docker config!"

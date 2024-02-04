@@ -157,17 +157,19 @@ class DockerChallengeType(BaseChallenge):
 
                 if is_teams_mode():
                     session = get_current_team()
-                    filter_params["team_id"] = session.id 
+                    filter_params["team_id"] = session.id
                 else:
                     session = get_current_user()
-                    filter_params["user_id"] = session.id 
-                    
+                    filter_params["user_id"] = session.id
+
                 curr_chal: DockerChallengeTracker = (
                     DockerChallengeTracker.query.filter_by(**filter_params).first()
                 )
                 if curr_chal is None:
                     return False, "Incorrect"
-                if flag_compare_type.compare(flag, submission, curr_chal.container_flag):
+                if flag_compare_type.compare(
+                    flag, submission, curr_chal.container_flag
+                ):
                     return True, "Correct"
             elif flag_compare_type.compare(flag, submission):
                 return True, "Correct"
