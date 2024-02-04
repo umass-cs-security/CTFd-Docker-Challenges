@@ -5,6 +5,7 @@ import tempfile
 import traceback
 from typing import Any, Dict, List, Tuple
 import requests
+import netifaces as ni
 
 from CTFd.plugins.docker_challenges.scripts.const import (
     ADMINISTRATIVE,
@@ -13,7 +14,6 @@ from CTFd.plugins.docker_challenges.scripts.const import (
     INVALID_FORMAT,
     INVALID_REGISTRY_SPECIFIED,
     REGISTRY_EMPTY,
-    CTF_FLAG_FORMAT,
     CTF_FLAG_PREFIX,
     CTF_FLAG_SUFFIX,
 )
@@ -241,18 +241,36 @@ def flag_generator(
 ) -> str:
     generated = "".join(random.SystemRandom().choice(chars) for _ in range(size))
     if prefix is not None:
-        need_flag_format = False
+        # remove CTF_SDaT surrounding
         if prefix.startswith(CTF_FLAG_PREFIX) and prefix.endswith(CTF_FLAG_SUFFIX):
             # print(f"Flag before stripping: '{prefix}'")
             prefix = prefix[len(CTF_FLAG_PREFIX) : -len(CTF_FLAG_SUFFIX)]
             # print(f"Flag after stripping: '{prefix}'")
-            need_flag_format = True
         generated = prefix + "_" + generated
+
     if suffix is not None:
+        # remove CTF_SDaT surrounding
+        if suffix.startswith(CTF_FLAG_PREFIX) and suffix.endswith(CTF_FLAG_SUFFIX):
+            suffix = suffix[len(CTF_FLAG_PREFIX) : -len(CTF_FLAG_SUFFIX)]
         generated += "_" + suffix
 
-    if need_flag_format:
-        generated = CTF_FLAG_PREFIX + generated + CTF_FLAG_SUFFIX
-        # print(f"Flag after adding: '{generated}'")
-        return generated
+    generated = CTF_FLAG_PREFIX + generated + CTF_FLAG_SUFFIX
+    # print(f"Flag after adding: '{generated}'")
     return generated
+
+
+def local_name_resolution(network_adaptor_name: str = "eth0") -> Tuple[bool, str]:
+    if network_adaptor_name not in ni.interfaces():
+        err_msg = f"localhost name resolution failed: specified network interface <{network_adaptor_name}> is unavilable!"
+        print(err_msg)
+        return False, err_msg
+    try:
+        print(ni.ifaddresses(network_adaptor_name))
+        print(ni.ifaddresses(network_adaptor_name)[ni.AF_INET])
+        print(ni.ifaddresses(network_adaptor_name)[ni.AF_INET][0])
+        return True, ni.ifaddresses(network_adaptor_name)[ni.AF_INET][0]["addr"]
+    except Exception as e:
+        traceback.print_exc()
+        err_msg = f"localhost name resolution failed: Unexpected error: {e}"
+        print(err_msg)
+        return False, err_msg

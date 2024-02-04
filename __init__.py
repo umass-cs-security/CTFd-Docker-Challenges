@@ -16,7 +16,6 @@ from CTFd.plugins.docker_challenges.scripts.namespace import (
     kill_container_namespace,
 )
 
-from netifaces import AF_INET
 import netifaces as ni
 
 
@@ -27,11 +26,13 @@ def default_docker_config():
         return
 
     if "eth0" not in ni.interfaces():
-        print("Cannot set defualt config for docker: default network interface 'eth0' is unavilable!")
+        print(
+            "Cannot set defualt config for docker: default network interface 'eth0' is unavilable!"
+        )
         return
 
     try:
-        curr_addr = ni.interfaces()[AF_INET][0]["addr"]
+        curr_addr = ni.ifaddresses("eth0")[ni.AF_INET][0]["addr"]
         new_docker = DockerConfig(
             hostname=f"{curr_addr}:56156",
             enginename=f"{curr_addr}:2375",

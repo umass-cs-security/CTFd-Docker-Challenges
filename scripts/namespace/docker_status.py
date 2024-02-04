@@ -2,7 +2,10 @@ from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallengeTracker,
     DockerConfig,
 )
-from CTFd.plugins.docker_challenges.scripts.func import VerifyImagesInRegistry
+from CTFd.plugins.docker_challenges.scripts.func import (
+    VerifyImagesInRegistry,
+    local_name_resolution,
+)
 from CTFd.utils.decorators import authed_only
 
 from CTFd.utils.user import get_current_team
@@ -52,6 +55,13 @@ class DockerStatus(Resource):
             tracker = DockerChallengeTracker.query.filter_by(user_id=session.id)
         data = list()
         for curr_challenge in tracker:
+            supply_image_host_name = str(docker.hostname).split(":")[0]
+            # try resolve localhost to the real network adaptor on VM
+            if "localhost" == supply_image_host_name:
+                ok, localhost_real_ip = local_name_resolution()
+                if ok:
+                    supply_image_host_name = localhost_real_ip
+
             current_data = {
                 "id": curr_challenge.id,
                 "team_id": curr_challenge.team_id,
@@ -61,7 +71,7 @@ class DockerStatus(Resource):
                 "revert_time": curr_challenge.revert_time,
                 "instance_id": curr_challenge.instance_id,
                 "ports": curr_challenge.ports.split(","),
-                "host": str(docker.hostname).split(":")[0],
+                "host": supply_image_host_name,
             }
             if len(verified_names) == 0:
                 # need to return all current user info
