@@ -10,6 +10,7 @@ from CTFd.plugins.docker_challenges.scripts.func import (
     allowed_file,
     get_repositories,
     VerifyImagesInRegistry,
+    local_name_resolution,
 )
 from CTFd.plugins.docker_challenges.scripts.const import (
     ALLOWED_EXTENSIONS,
@@ -95,8 +96,17 @@ def define_docker_admin(app):
                 active_docker.client_cert = client_cert
             if len(client_key) != 0:
                 active_docker.client_key = client_key
-            active_docker.hostname = request.form["hostname"]
-            active_docker.enginename = request.form["enginename"]
+            
+            # 
+            tmp_hostname = request.form["hostname"]
+            tmp_enginename = request.form["enginename"]
+            if "localhost" in tmp_hostname:
+                ok, localhost_real_name = local_name_resolution()
+                if ok:
+                    tmp_hostname = tmp_hostname.replace("localhost",localhost_real_name)
+                    tmp_enginename = tmp_enginename.replace("localhost",localhost_real_name)
+            active_docker.hostname = tmp_hostname
+            active_docker.enginename = tmp_enginename
             active_docker.tls_enabled = request.form["tls_enabled"]
             if active_docker.tls_enabled == "True":
                 active_docker.tls_enabled = True

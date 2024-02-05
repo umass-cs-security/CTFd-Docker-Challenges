@@ -53,8 +53,14 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
     target_registry_name = "/".join(target_container_name_components[:-1])
 
     if target_registry_name != docker.hostname:
-        print(target_container_name, docker.hostname)
-        return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
+        # print(target_container_name, docker.hostname)
+        if "localhost" not in target_registry_name:
+            return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
+        ok, localhost_real_name = local_name_resolution()
+        if not ok:
+            return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
+        
+        target_registry_name = target_registry_name.replace("localhost",localhost_real_name)
 
     target_container_name = target_container_name_components[-1]
     image_tag = target_container_name.split(":")
@@ -265,12 +271,29 @@ def local_name_resolution(network_adaptor_name: str = "eth0") -> Tuple[bool, str
         print(err_msg)
         return False, err_msg
     try:
-        print(ni.ifaddresses(network_adaptor_name))
-        print(ni.ifaddresses(network_adaptor_name)[ni.AF_INET])
-        print(ni.ifaddresses(network_adaptor_name)[ni.AF_INET][0])
+        # print(ni.ifaddresses(network_adaptor_name))
+        # print(ni.ifaddresses(network_adaptor_name)[ni.AF_INET])
+        # print(ni.ifaddresses(network_adaptor_name)[ni.AF_INET][0])
         return True, ni.ifaddresses(network_adaptor_name)[ni.AF_INET][0]["addr"]
     except Exception as e:
         traceback.print_exc()
         err_msg = f"localhost name resolution failed: Unexpected error: {e}"
         print(err_msg)
         return False, err_msg
+
+def local_name_reverse_map(query_hostname: str) -> Tuple[bool, str]: 
+    curr_hostname = query_hostname.split("/")[0].split(":")[0]
+    for curr_adaptor in ni.interfaces():
+        try:
+            curr_ipv4_addr = ni.ifaddresses(curr_adaptor)[ni.AF_INET][0]["addr"]
+            # print(curr_hostname, curr_ipv4_addr, curr_hostname == curr_ipv4_addr)
+            if curr_hostname == curr_ipv4_addr:
+                return True, curr_hostname
+        except KeyError as ke:
+            continue
+        except Exception as e:
+            traceback.print_exc()
+            err_msg = f"localhost name reverse mapping failed: Unexpected error: {e}"
+            print(err_msg)
+    return False, ""
+    

@@ -12,6 +12,7 @@ from CTFd.plugins.docker_challenges.scripts.func import (
     do_request,
     get_required_ports,
     get_unavailable_ports,
+    local_name_reverse_map,
 )
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallenge,
@@ -107,9 +108,17 @@ def create_container(docker, image, active_flag, team, team_indexing=None):
         ports[i] = {}
         bindings[i] = [{"HostPort": tmp_ports.pop()}]
 
+    tmp_hostname = docker.hostname
+    # check whether we need to translate ipv4 addr back to localhost
+    if "localhost" not in tmp_hostname:
+        ok, mapped_hostname = local_name_reverse_map(docker.hostname)
+        if ok:
+            tmp_hostname = tmp_hostname.replace(mapped_hostname, "localhost")
+
+
     data = json.dumps(
         {
-            "Image": f"{docker.hostname}/{image}",  # image is under the registry
+            "Image": f"{tmp_hostname}/{image}",  # image is under the registry
             "ExposedPorts": ports,
             "HostConfig": {
                 "PortBindings": bindings,

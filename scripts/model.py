@@ -22,8 +22,8 @@ class DockerConfig(db.Model):
     """
 
     id = db.Column(db.Integer, primary_key=True)
-    hostname = db.Column("hostname", db.String(64), index=True)
-    enginename = db.Column("enginename", db.String(64), index=True)
+    hostname = db.Column("hostname", db.String(64), index=True) # will try to translated into real ip if "localhost" is specified
+    enginename = db.Column("enginename", db.String(64), index=True) # will try to translated into real ip if "localhost" is specified
     tls_enabled = db.Column("tls_enabled", db.Boolean, default=False, index=True)
     ca_cert = db.Column("ca_cert", db.String(2200), index=True)
     client_cert = db.Column("client_cert", db.String(2000), index=True)
