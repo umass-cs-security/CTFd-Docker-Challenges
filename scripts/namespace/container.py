@@ -6,6 +6,7 @@ from CTFd.plugins.docker_challenges.scripts.container import (
 from CTFd.plugins.docker_challenges.scripts.func import (
     VerifyImagesInRegistry,
     flag_generator,
+    local_name_reverse_map
 )
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallengeTracker,
@@ -55,6 +56,7 @@ class ContainerAPI(Resource):
                 err_msgs.append(error_msg)
                 continue
             verified_images.append(verified_image)
+            
 
         if len(err_msgs) > 0:
             err_msgs = ",\n".join(err_msgs)
@@ -75,8 +77,17 @@ class ContainerAPI(Resource):
             curr_verified_image_components = verified_image.split(":")
             # remove the last element which is the tag of the image
             curr_verified_image_name = ":".join(curr_verified_image_components[:-1])
+            
+            tmp_hostname = docker.hostname
+
+            # check whether we need to translate ipv4 addr back to localhost
+            if "localhost" not in tmp_hostname:
+                ok, mapped_hostname = local_name_reverse_map(docker.hostname)
+                if ok:
+                    tmp_hostname = tmp_hostname.replace(mapped_hostname, "localhost")
+
             verified_image_names_with_docker_host += (
-                f"{docker.hostname}/{curr_verified_image_name}"
+                f"{tmp_hostname}/{curr_verified_image_name}"
             )
 
         curr_docker_chal: DockerChallenge = DockerChallenge.query.filter_by(
