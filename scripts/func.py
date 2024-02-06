@@ -1,3 +1,4 @@
+from collections import defaultdict
 import json
 import tempfile
 import traceback
@@ -20,6 +21,25 @@ def allowed_file(filename):
 
 def dict_to_query_param(inputs: Dict[str, Any]) -> str:
     return "?" + "&".join([f"{key}={value}" for key, value in inputs.items()])
+
+
+def VerifyImagesInRegistry(
+    docker, target_container_names: str
+) -> Tuple[bool, str, str]:
+    target_container_names = target_container_names.split(",")
+    sanitized_names = []
+    ok = True
+    err_msg = None
+    for target_container_name in target_container_names:
+        ok, sanitized_name, err_msg = VerifyImageInRegistry(
+            docker, target_container_name
+        )
+        if not ok:
+            break
+        sanitized_names.append(sanitized_name)
+    if not ok:
+        return ok, None, err_msg
+    return ok, ",".join(sanitized_names), err_msg
 
 
 def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str, str]:
@@ -142,6 +162,7 @@ def get_unavailable_ports(docker):
 
 
 def get_required_ports(docker, image):
+    exposed_ports = list()
     # image should in format 'imageName:imagTag'
     repo_name, repo_tag = image.split(":")
     # r = do_request(docker, f'/images/{image}/json?all=1')
@@ -149,18 +170,21 @@ def get_required_ports(docker, image):
         docker, f"/v2/{repo_name}/manifests/{repo_tag}", host=docker.hostname
     )
     if res is None or not hasattr(res, "json"):
-        return
+        return False, "No valid port information retrieved: repo cannot be found"
     res = res.json()
     if "history" not in res:
-        return
+        return (
+            False,
+            "No valid port information retrieved: history section cannot be found",
+        )
     for possible_entry in res["history"]:
         curr_content = possible_entry["v1Compatibility"]
         if "ExposedPorts" not in curr_content:
             continue
         curr_content_json = json.loads(curr_content)
-        return curr_content_json["config"]["ExposedPorts"].keys()
-    # result = r.json()['ContainerConfig']['ExposedPorts'].keys()
-    return
+        exposed_ports.extend(curr_content_json["config"]["ExposedPorts"].keys())
+        # result = r.json()['ContainerConfig']['ExposedPorts'].keys()
+    return True, exposed_ports
 
 
 def do_request(docker, url, method="GET", host=None, headers=None, **params):
@@ -198,7 +222,7 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
             }
             req_params.update(tls_params)
         res = http_func(**req_params)
-    except:
+    except Exception as e:
         print(traceback.print_exc())
-        res = []
+        res = str(e)
     return res

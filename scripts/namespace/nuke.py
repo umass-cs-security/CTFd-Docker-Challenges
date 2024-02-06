@@ -1,5 +1,5 @@
 from CTFd.models import db
-from CTFd.plugins.docker_challenges.scripts.container import delete_container
+from CTFd.plugins.docker_challenges.scripts.container import delete_containers
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerConfig,
     DockerChallengeTracker,
@@ -23,7 +23,7 @@ class KillContainerAPI(Resource):
         docker_tracker = DockerChallengeTracker.query.all()
         if full == "true":
             for c in docker_tracker:
-                delete_container(docker_config, c.instance_id)
+                delete_containers(docker_config, c.instance_id)
                 DockerChallengeTracker.query.filter_by(
                     instance_id=c.instance_id
                 ).delete()
@@ -32,7 +32,7 @@ class KillContainerAPI(Resource):
         elif container != "null" and container in [
             c.instance_id for c in docker_tracker
         ]:
-            delete_container(docker_config, container)
+            delete_containers(docker_config, container)
             DockerChallengeTracker.query.filter_by(instance_id=container).delete()
             db.session.commit()
 

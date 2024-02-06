@@ -11,7 +11,7 @@ from CTFd.models import (
     Flags,
 )
 from CTFd.plugins.challenges import BaseChallenge
-from CTFd.plugins.docker_challenges.scripts.container import delete_container
+from CTFd.plugins.docker_challenges.scripts.container import delete_containers
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallenge,
     DockerChallengeTracker,
@@ -181,7 +181,7 @@ class DockerChallengeType(BaseChallenge):
                     .filter_by(user_id=user.id)
                     .first()
                 )
-            delete_container(docker, docker_containers.instance_id)
+            delete_containers(docker, docker_containers.instance_id)
             DockerChallengeTracker.query.filter_by(
                 inst4ance_id=docker_containers.instance_id
             ).delete()

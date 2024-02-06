@@ -1,9 +1,9 @@
 from CTFd.models import db
 from CTFd.plugins.docker_challenges.scripts.container import (
-    create_container,
-    delete_container,
+    create_containers,
+    delete_containers,
 )
-from CTFd.plugins.docker_challenges.scripts.func import VerifyImageInRegistry
+from CTFd.plugins.docker_challenges.scripts.func import VerifyImagesInRegistry
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallengeTracker,
     DockerConfig,
@@ -35,13 +35,13 @@ class ContainerAPI(Resource):
     # I wish this was Post... Issues with API/CSRF and whatnot. Open to a Issue solving this.
     def get(self):
         # name should in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
-        container = request.args.get("name")
-        if not container:
+        container_names = request.args.get("name")
+        if not container_names:
             return abort(403, description="Image Not Specified in Request!")
         docker = DockerConfig.query.filter_by(id=1).first()
         containers = DockerChallengeTracker.query.all()
 
-        ok, container, error_msg = VerifyImageInRegistry(docker, container)
+        ok, container_names, error_msg = VerifyImagesInRegistry(docker, container_names)
         if not ok:
             return abort(
                 405,
@@ -56,14 +56,14 @@ class ContainerAPI(Resource):
                     int(session.id) == int(i.team_id)
                     and (unix_time(datetime.utcnow()) - int(i.timestamp)) >= 7200
                 ):
-                    delete_container(docker, i.instance_id)
+                    delete_containers(docker, i.instance_id)
                     DockerChallengeTracker.query.filter_by(
                         instance_id=i.instance_id
                     ).delete()
                     db.session.commit()
             check = (
                 DockerChallengeTracker.query.filter_by(team_id=session.id)
-                .filter_by(docker_image=container)
+                .filter_by(docker_image=container_names)
                 .first()
             )
         else:
@@ -73,7 +73,7 @@ class ContainerAPI(Resource):
                     int(session.id) == int(i.user_id)
                     and (unix_time(datetime.utcnow()) - int(i.timestamp)) >= 7200
                 ):
-                    delete_container(docker, i.instance_id)
+                    delete_containers(docker, i.instance_id)
                     DockerChallengeTracker.query.filter_by(
                         instance_id=i.instance_id
                     ).delete()
@@ -81,7 +81,7 @@ class ContainerAPI(Resource):
             # check is none => docker image is running
             check = (
                 DockerChallengeTracker.query.filter_by(user_id=session.id)
-                .filter_by(docker_image=container)
+                .filter_by(docker_image=container_names)
                 .first()
             )
         # If this container is already created, we don't need another one.
@@ -95,36 +95,45 @@ class ContainerAPI(Resource):
             )
         # The exception would be if we are reverting a box. So we'll delete it if it exists and has been around for more than 5 minutes.
         elif check != None:
-            delete_container(docker, check.instance_id)
+            delete_containers(docker, check.instance_id)
             if is_teams_mode():
                 DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(
-                    docker_image=container
+                    docker_image=container_names
                 ).delete()
             else:
                 DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(
-                    docker_image=container
+                    docker_image=container_names
                 ).delete()
             db.session.commit()
-        created_info, payload = create_container(docker, container, session.name)
-        if created_info is None:
-            # print("Error during creating container: ", payload)
-            return abort(403, payload)
-        ports = json.loads(payload)["HostConfig"]["PortBindings"].values()
-        print(
-            f"Adding new container: <{container}>:<{created_info['Id']}> for <{session.name}>"
+        created_infos, err_msg = create_containers(
+            docker, container_names, session.name
         )
+        if created_infos is None:
+            # print("Error during creating container: ", payload)
+            return abort(403, err_msg)
+
+        new_used_ports = []
+        ids = []
+        for key, (created_info, payload) in created_infos.items():
+            new_used_ports.extend(
+                json.loads(payload)["HostConfig"]["PortBindings"].values()
+            )
+            ids.append(created_info["Id"])
+
+        ids_str = ",".join(ids)
+        print(f"Adding new container(s): <{ids_str}> for <{session.name}>")
         entry = DockerChallengeTracker(
             team_id=session.id if is_teams_mode() else None,
             user_id=session.id if not is_teams_mode() else None,
-            docker_image=container,
+            docker_image=container_names,
             timestamp=unix_time(datetime.utcnow()),
             revert_time=unix_time(datetime.utcnow()) + 300,
-            instance_id=created_info["Id"],
-            ports=",".join([port[0]["HostPort"] for port in ports]),
+            instance_id=ids_str,
+            ports=",".join([port[0]["HostPort"] for port in new_used_ports]),
             host=str(docker.enginename).split(":")[0],
         )
         print(
-            f"Added new container: <{container}>:<{created_info['Id']}> for <{session.name}> at {entry.timestamp}"
+            f"Added new container(s): <{ids_str}> for <{session.name}> at {entry.timestamp}"
         )
         db.session.add(entry)
         db.session.commit()

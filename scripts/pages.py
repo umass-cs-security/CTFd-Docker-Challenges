@@ -9,7 +9,7 @@ from CTFd.plugins.docker_challenges.scripts.challenge import DockerChallengeType
 from CTFd.plugins.docker_challenges.scripts.func import (
     allowed_file,
     get_repositories,
-    VerifyImageInRegistry,
+    VerifyImagesInRegistry,
 )
 from CTFd.plugins.docker_challenges.scripts.const import (
     ALLOWED_EXTENSIONS,
@@ -156,11 +156,11 @@ def define_docker_status(app):
     def docker_admin():
         docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
-        target_challenge_name = request.args.get("name", "").lower()
+        target_challenge_names = request.args.get("name", "").lower()
 
-        if target_challenge_name != "":
-            ok, target_challenge_name, error_msg = VerifyImageInRegistry(
-                docker_config, target_challenge_name
+        if target_challenge_names != "":
+            ok, target_challenge_names, error_msg = VerifyImagesInRegistry(
+                docker_config, target_challenge_names
             )
             if not ok:
                 # if not ok, just consider this as invalid status query, i.e., return no result
@@ -168,11 +168,11 @@ def define_docker_status(app):
 
         for curr_tracked_challenge in docker_tracker:
             curr_tracked_challenge: DockerChallengeTracker
-            if target_challenge_name != "":
-                if curr_tracked_challenge.docker_image == target_challenge_name:
-                    target = curr_tracked_challenge.__dict__.copy()
-                    setattr(target, "requested", True)
-                    return render_template("admin_docker_status.html", dockers=[target])
+            if target_challenge_names != "":
+                if curr_tracked_challenge.docker_image == target_challenge_names:
+                    return render_template(
+                        "admin_docker_status.html", dockers=[curr_tracked_challenge]
+                    )
                 else:
                     continue
             if is_teams_mode():
@@ -182,7 +182,7 @@ def define_docker_status(app):
                 name = Users.query.filter_by(id=curr_tracked_challenge.user_id).first()
                 curr_tracked_challenge.user_id = name.name
 
-        if target_challenge_name != "":
+        if target_challenge_names != "":
             return render_template("admin_docker_status.html", dockers=[])
 
         return render_template("admin_docker_status.html", dockers=docker_tracker)
@@ -382,14 +382,15 @@ def define_docker_import(app):
                     and new_challenge_update_dict["hints"] is not None
                 ):
                     hints = [
-                        hint.strip()
+                        hint
                         for hint in new_challenge_update_dict["hints"]
                         if hint is not None
                     ]
                     for hint in hints:
                         h = Hints(
                             challenge_id=new_challenge_id,
-                            content=hint,
+                            content=hint["content"],
+                            cost=hint["cost"],
                         )
                         db.session.add(h)
                         db.session.commit()
