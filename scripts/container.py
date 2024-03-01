@@ -115,7 +115,6 @@ def create_container(docker, image, active_flag, team, team_indexing=None):
         if ok:
             tmp_hostname = tmp_hostname.replace(mapped_hostname, "localhost")
 
-
     data = json.dumps(
         {
             "Image": f"{tmp_hostname}/{image}",  # image is under the registry

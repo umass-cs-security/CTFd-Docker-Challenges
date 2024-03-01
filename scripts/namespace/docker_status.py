@@ -29,7 +29,6 @@ class DockerStatus(Resource):
 
     @authed_only
     def get(self):
-
         docker = DockerConfig.query.filter_by(id=1).first()
 
         target_challenge_names = request.args.get("name", "").lower()

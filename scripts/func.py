@@ -59,8 +59,10 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
         ok, localhost_real_name = local_name_resolution()
         if not ok:
             return (False, None, INVALID_REGISTRY_SPECIFIED + " " + ADMINISTRATIVE)
-        
-        target_registry_name = target_registry_name.replace("localhost",localhost_real_name)
+
+        target_registry_name = target_registry_name.replace(
+            "localhost", localhost_real_name
+        )
 
     target_container_name = target_container_name_components[-1]
     image_tag = target_container_name.split(":")
@@ -281,7 +283,8 @@ def local_name_resolution(network_adaptor_name: str = "eth0") -> Tuple[bool, str
         print(err_msg)
         return False, err_msg
 
-def local_name_reverse_map(query_hostname: str) -> Tuple[bool, str]: 
+
+def local_name_reverse_map(query_hostname: str) -> Tuple[bool, str]:
     curr_hostname = query_hostname.split("/")[0].split(":")[0]
     for curr_adaptor in ni.interfaces():
         try:
@@ -296,4 +299,3 @@ def local_name_reverse_map(query_hostname: str) -> Tuple[bool, str]:
             err_msg = f"localhost name reverse mapping failed: Unexpected error: {e}"
             print(err_msg)
     return False, ""
-    
