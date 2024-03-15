@@ -3,9 +3,10 @@ import json
 import random
 
 import flask
+
 from CTFd.plugins.docker_challenges.scripts.const import (
-    Default_Headers,
     DOCKER_CHALLENGES_LABEL,
+    Default_Headers,
 )
 from CTFd.plugins.docker_challenges.scripts.func import (
     dict_to_query_param,
@@ -14,9 +15,7 @@ from CTFd.plugins.docker_challenges.scripts.func import (
     get_unavailable_ports,
     local_name_reverse_map,
 )
-from CTFd.plugins.docker_challenges.scripts.model import (
-    DockerChallenge,
-)
+from CTFd.plugins.docker_challenges.scripts.model import DockerChallenge
 
 
 def start_container(docker, container_name, headers=None):
@@ -95,18 +94,31 @@ def create_container(docker, image, active_flag, team, team_indexing=None):
         ]
     container_name = "%s_%s" % (image.split(":")[0], team)
     assigned_ports = dict()
-    for i in needed_ports:
+    unavailable_ports = get_unavailable_ports(docker)
+    needed_ports = list(needed_ports)
+    # needed_port in format '3000/tcp'
+    for needed_port in needed_ports:
         while True:
-            assigned_port = random.choice(range(30000, 60000))
-            if assigned_port not in get_unavailable_ports(docker):
-                assigned_ports["%s/tcp" % assigned_port] = {}
+            assigned_port = random.choice(range(40000, 60000))
+            if assigned_port not in unavailable_ports:
+                # mapping from needed port on docker container to assigned port on host
+                assigned_ports[needed_port] = f"{assigned_port}/tcp"
+                unavailable_ports.append(assigned_port)
                 break
+    while True:
+        forwarding_port = random.choice(range(20000, 40000))
+        if forwarding_port not in unavailable_ports:
+            # always expose port 56156, in case student want to perform reverse shell on target
+            needed_ports.append("56156/tcp")
+            # forward traffic from 56156 on docker container to forwarding port on host
+            assigned_ports["56156/tcp"] = f"{forwarding_port}/tcp"
+            break
     ports = dict()
     bindings = dict()
-    tmp_ports = list(assigned_ports.keys())
-    for i in needed_ports:
-        ports[i] = {}
-        bindings[i] = [{"HostPort": tmp_ports.pop()}]
+    # tmp_ports = list(assigned_ports.keys())
+    for container_port, host_port in assigned_ports.items():
+        ports[container_port] = {}
+        bindings[container_port] = [{"HostPort": host_port}]
 
     tmp_hostname = docker.hostname
     # check whether we need to translate ipv4 addr back to localhost
