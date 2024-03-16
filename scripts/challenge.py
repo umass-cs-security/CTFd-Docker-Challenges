@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import Dict, List
 from flask import Blueprint
 from CTFd.models import (
     ChallengeFiles,
@@ -12,6 +12,8 @@ from CTFd.models import (
     Flags,
 )
 from CTFd.plugins.challenges import BaseChallenge
+
+from CTFd.plugins.docker_challenges.scripts.func import sanitizing_docker_image_name
 from CTFd.plugins.docker_challenges.scripts.container import delete_container
 from CTFd.plugins.docker_challenges.scripts.model import (
     DockerChallenge,
@@ -57,7 +59,15 @@ class DockerChallengeType(BaseChallenge):
         :param request:
         :return:
         """
-        data = request.form or request.get_json()
+        data: Dict = request.form or request.get_json()
+
+        if "docker_image" in data:
+            if data["docker_image"] is None:
+                data.pop("docker_image")
+            else:
+                data["docker_image"] = sanitizing_docker_image_name(
+                    data.get("docker_image")
+                )
         for attr, value in data.items():
             setattr(challenge, attr, value)
 
@@ -126,6 +136,10 @@ class DockerChallengeType(BaseChallenge):
             data = dict_form
         else:
             data = request.form or request.get_json()
+
+        data["docker_image"] = sanitizing_docker_image_name(
+            data.get("docker_image", None)
+        )
         print(json.dumps(data, indent=4))
         challenge = DockerChallenge(**data)
         db.session.add(challenge)

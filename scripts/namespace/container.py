@@ -48,7 +48,9 @@ class ContainerAPI(Resource):
         docker: DockerConfig = DockerConfig.query.filter_by(id=1).first()
         existing_containers = DockerChallengeTracker.query.all()
 
+        # print(f"Unverified result: {container_names}")
         results = VerifyImagesInRegistry(docker, container_names)
+        # print(f"Verified result: {results}")
         err_msgs = []
         verified_images = []
         for ok, verified_image, error_msg in results:
@@ -89,12 +91,14 @@ class ContainerAPI(Resource):
                 f"{tmp_hostname}/{curr_verified_image_name}"
             )
 
+        # print(f"Verified result with host: {verified_image_names_with_docker_host}")
         curr_docker_chal: DockerChallenge = DockerChallenge.query.filter_by(
             docker_image=verified_image_names_with_docker_host
         ).first()
         if curr_docker_chal is None:
             chals = DockerChallenge.query.all()
-            contained = ";;".join([elem.docker_image for elem in chals])
+            contained = "<" + ">\t<".join([elem.docker_image for elem in chals]) + ">"
+            # print(f"Specified images are not selected in docker config: <{container_names}> -> <{verified_image_names_with_docker_host}>\n{contained}")
             return abort(
                 403,
                 description=f"Specified images are not selected in docker config: <{container_names}> -> <{verified_image_names_with_docker_host}>\n{contained}",

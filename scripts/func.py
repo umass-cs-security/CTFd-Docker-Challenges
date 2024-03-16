@@ -42,8 +42,10 @@ def VerifyImageInRegistry(docker, target_container_name: str) -> Tuple[bool, str
 
     if "/" not in target_container_name:
         # name in format of 'dockerImageName:dockerImageTag', such as 'test:latest'
+        if target_container_name in fetched_repos:
+            return True, target_container_name, None
         return (
-            target_container_name in fetched_repos,
+            False,
             target_container_name,
             IMAGE_NOT_EXIST + " " + ADMINISTRATIVE,
         )
@@ -299,3 +301,36 @@ def local_name_reverse_map(query_hostname: str) -> Tuple[bool, str]:
             err_msg = f"localhost name reverse mapping failed: Unexpected error: {e}"
             print(err_msg)
     return False, ""
+
+
+def sanitizing_docker_image_name(
+    unsanitized_name: str, docker_registry_hostname: str = "localhost:56156"
+) -> str:
+    """
+    Acceptable Inputs:
+    <challenge category>-<challenge name>
+
+    <challenge category>-<challenge name>:<challenge tag>
+
+    Note: it does not verify whether image is in the docker registry specified in the input
+
+    Return docker image in format: <docker registry hostname with port>/<challenge category>-<challenge name>
+    E.g. localhost:56156/misc-free-points
+    """
+    # remove docker registry hostname
+    # print(unsanitized_name)
+    unsanitized_challenge_image_name_without_hostname = unsanitized_name.split("/")[-1]
+    # print(unsanitized_challenge_image_name_without_hostname)
+    unsanitized_challenge_image_name_colon_sep = (
+        unsanitized_challenge_image_name_without_hostname.split(":")
+    )
+    if len(unsanitized_challenge_image_name_colon_sep) > 1:
+        unsanitized_challenge_image_name_without_tag = ":".join(
+            unsanitized_challenge_image_name_colon_sep[:-1]
+        )
+    else:
+        unsanitized_challenge_image_name_without_tag = (
+            unsanitized_challenge_image_name_colon_sep[0]
+        )
+    # print(unsanitized_challenge_image_name_without_tag)
+    return f"{docker_registry_hostname}/{unsanitized_challenge_image_name_without_tag}"
