@@ -168,7 +168,10 @@ def get_unavailable_ports(docker):
     for i in r.json():
         if not i["Ports"] == []:
             for p in i["Ports"]:
-                result.append(p["PublicPort"])
+                if "PublicPort" in p:
+                    result.append(p["PublicPort"])
+                else:
+                    print(f"Public Port not available in setting: {p}")
     return result
 
 
