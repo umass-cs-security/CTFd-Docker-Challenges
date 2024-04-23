@@ -57,4 +57,3 @@ def load(app):
     CTFd_API_v1.add_namespace(container_namespace, "/container")
     CTFd_API_v1.add_namespace(active_docker_namespace, "/docker_status")
     CTFd_API_v1.add_namespace(kill_container_namespace, "/nuke")
-    # CTFd_API_v1.add_namespace(docker_import_namespace, "/docker_import")

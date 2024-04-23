@@ -226,13 +226,15 @@ def do_request(docker, url, method="GET", host=None, headers=None, **params):
 
     res = None
     try:
-        if docker.tls_enabled:
-            cert = get_client_cert(docker)
-            tls_params = {
-                "cert": cert,
-                "verify": False,
-            }
-            req_params.update(tls_params)
+        # if docker.tls_enabled:
+        client_cert_file = "/CTFd_Platform/Docker-Registry/auth/client-cert.pem"
+        client_key_file = "/CTFd_Platform/Docker-Registry/auth/client-key.pem"
+        ca_cert_file = "/CTFd_Platform/Docker-Registry/auth/ca.pem"
+        tls_params = {
+            "cert": (client_cert_file, client_key_file),
+            "verify": ca_cert_file,
+        }
+        req_params.update(tls_params)
         res = http_func(**req_params)
     except Exception as e:
         err_msg = f"Unexpected error when issue request to {url}. Detail: {e}"
