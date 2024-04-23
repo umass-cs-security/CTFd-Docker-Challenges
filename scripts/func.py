@@ -198,9 +198,9 @@ def get_required_ports(docker, image):
 
 
 def do_request(docker, url, method="GET", host=None, headers=None, **params):
-    prefix = "https" if docker.tls_enabled else "http"
     if host is None:
         host = docker.enginename
+    prefix = "https" if host==docker.enginename else "http"
     url = f"{prefix}://{host}{url}"
 
     http_func = None

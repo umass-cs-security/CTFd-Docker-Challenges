@@ -35,8 +35,8 @@ def default_docker_config():
         curr_addr = ni.ifaddresses("eth0")[ni.AF_INET][0]["addr"]
         new_docker = DockerConfig(
             hostname=f"{curr_addr}:56156",
-            enginename=f"{curr_addr}:2375",
-            tls_enabled=False,
+            enginename=f"{curr_addr}:2376",
+            tls_enabled=True,
         )
         db.session.add(new_docker)
         db.session.commit()
